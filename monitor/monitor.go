@@ -87,14 +87,14 @@ func (m *Monitor) Start() error {
 		zap.String("interface", m.config.NetworkInterface),
 		zap.Bool("external_ip_enabled", m.config.CheckExternalIP))
 
+	// Perform initial check and send notification
+	if err := m.initialCheck(); err != nil {
+		m.logger.Error("Initial IP check failed", zap.Error(err))
+	}
+
 	// Create ticker for regular checks
 	ticker := time.NewTicker(time.Duration(m.config.CheckInterval) * time.Second)
 	defer ticker.Stop()
-
-	// Perform initial check
-	if err := m.checkIP(m.ctx); err != nil {
-		m.logger.Error("Initial IP check failed", zap.Error(err))
-	}
 
 	// Main monitoring loop
 	for {
@@ -131,6 +131,85 @@ func (m *Monitor) Stop(ctx context.Context) error {
 	case <-ctx.Done():
 		return fmt.Errorf("shutdown timed out: %w", ctx.Err())
 	}
+}
+
+// initialCheck performs the first check and sends initial notification
+func (m *Monitor) initialCheck() error {
+	// Get current IPs
+	currentState, err := m.getCurrentIPs()
+	if err != nil {
+		return fmt.Errorf("failed to get current IPs for initial notification: %w", err)
+	}
+
+	// Ensure the state is properly initialized
+	if currentState.IPv4 == nil {
+		currentState.IPv4 = make([]string, 0)
+	}
+	if currentState.IPv6 == nil {
+		currentState.IPv6 = make([]string, 0)
+	}
+	currentState.UpdatedAt = time.Now()
+
+	// Get external IP if enabled
+	if m.config.CheckExternalIP {
+		if externalIP, err := m.getExternalIP(m.ctx); err == nil {
+			currentState.ExternalIP = externalIP
+		} else {
+			m.logger.Warn("Failed to get external IP for initial notification", zap.Error(err))
+		}
+	}
+
+	// Save the current state as last state
+	m.mu.Lock()
+	m.lastState = *currentState
+	m.mu.Unlock()
+
+	// Update network stats
+	m.metrics.UpdateNetworkStats(currentState)
+
+	// Log the initial state
+	m.logger.Info("Initial IP state",
+		zap.Any("ipv4", currentState.IPv4),
+		zap.Any("ipv6", currentState.IPv6),
+		zap.String("external_ip", currentState.ExternalIP),
+		zap.Time("updated_at", currentState.UpdatedAt))
+
+	// Prepare initial notification message
+	changes := []string{
+		"Initial state notification",
+	}
+	if len(currentState.IPv4) > 0 {
+		changes = append(changes, fmt.Sprintf("IPv4 Addresses: %v", currentState.IPv4))
+	}
+	if len(currentState.IPv6) > 0 {
+		changes = append(changes, fmt.Sprintf("IPv6 Addresses: %v", currentState.IPv6))
+	}
+	if currentState.ExternalIP != "" {
+		changes = append(changes, fmt.Sprintf("External IP: %s", currentState.ExternalIP))
+	}
+
+	// Create empty initial state for comparison
+	emptyState := types.IPState{
+		IPv4:       make([]string, 0),
+		IPv6:       make([]string, 0),
+		UpdatedAt:  time.Time{},
+		ExternalIP: "",
+	}
+
+	// Send initial notification
+	if err := m.notifier.NotifyIPChange(emptyState, *currentState, changes); err != nil {
+		return fmt.Errorf("failed to send initial notification: %w", err)
+	}
+
+	// Save state after successful notification
+	if err := m.saveState(); err != nil {
+		m.logger.Error("Failed to save initial state",
+			zap.Error(err),
+			zap.String("interface", m.config.NetworkInterface))
+	}
+
+	m.logger.Info("Sent initial IP state notification")
+	return nil
 }
 
 // checkIP performs a single IP check iteration
@@ -235,14 +314,20 @@ func (m *Monitor) getCurrentIPs() (*types.IPState, error) {
 
 	for _, addr := range addrs {
 		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ip4 := ipnet.IP.To4(); ip4 != nil {
+			if ip4 := ipnet.IP.To4(); ip4 != nil && m.config.IPVersion.EnableIPv4 {
 				state.IPv4 = append(state.IPv4, ip4.String())
-			} else if ip6 := ipnet.IP.To16(); ip6 != nil && utils.IsGlobalIPv6(ip6) {
+			} else if ip6 := ipnet.IP.To16(); ip6 != nil && m.config.IPVersion.EnableIPv6 && utils.IsGlobalIPv6(ip6) {
 				// Only add global IPv6 addresses
 				state.IPv6 = append(state.IPv6, ip6.String())
 			}
 		}
 	}
+
+	// Log the found IPs
+	m.logger.Debug("Found IP addresses",
+		zap.Strings("ipv4", state.IPv4),
+		zap.Strings("ipv6", state.IPv6),
+		zap.String("interface", m.config.NetworkInterface))
 
 	return state, nil
 }

@@ -53,18 +53,14 @@ func NewTelegramNotifier(config *config.Telegram) (*TelegramNotifier, error) {
 }
 
 // Send sends a Telegram notification about IP changes
-func (n *TelegramNotifier) Send(oldState, newState types.IPState, changes []string) error {
+func (n *TelegramNotifier) Send(oldState, newState types.IPState, changes []string, isInitial bool) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "unknown"
 	}
 
 	// Prepare message text
-	message := formatTelegramMessage(hostname, &oldState, &newState, changes)
-
-	if newState.ExternalIP != "" {
-		message += fmt.Sprintf("External IP: `%s`\n", newState.ExternalIP)
-	}
+	message := formatTelegramMessage(hostname, &oldState, &newState, changes, isInitial)
 
 	// Send to all configured chat IDs
 	var lastErr error
@@ -100,16 +96,25 @@ func (n *TelegramNotifier) sendMessage(chatID, text string) error {
 }
 
 // formatTelegramMessage formats a message for Telegram
-func formatTelegramMessage(hostname string, oldState, newState *types.IPState, changes []string) string {
+func formatTelegramMessage(hostname string, oldState, newState *types.IPState, changes []string, isInitial bool) string {
 	var b strings.Builder
 
-	b.WriteString("*IP Address Change Alert*\n\n")
+	if isInitial {
+		b.WriteString("*IP Monitor Started - Initial State*\n\n")
+	} else {
+		b.WriteString("*IP Address Change Alert*\n\n")
+	}
+
 	b.WriteString(fmt.Sprintf("*Host:* `%s`\n", hostname))
 	b.WriteString(fmt.Sprintf("*Time:* `%s`\n\n", time.Now().Format("2006-01-02 15:04:05")))
 
-	b.WriteString("*Changes:*\n")
-	for _, change := range changes {
-		b.WriteString(fmt.Sprintf("• %s\n", change))
+	if isInitial {
+		b.WriteString("*Initial Configuration:*\n")
+	} else {
+		b.WriteString("*Changes:*\n")
+		for _, change := range changes {
+			b.WriteString(fmt.Sprintf("• %s\n", change))
+		}
 	}
 	b.WriteString("\n")
 

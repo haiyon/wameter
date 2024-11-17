@@ -28,6 +28,7 @@ type emailData struct {
 	OldState  types.IPState
 	NewState  types.IPState
 	UpdatedAt time.Time
+	IsInitial bool
 }
 
 const emailTemplate = `
@@ -44,17 +45,24 @@ const emailTemplate = `
         .ip-group { margin: 10px 0; }
         .ip-group h4 { margin: 5px 0; }
         .ip-list { margin: 5px 0; padding-left: 20px; }
+        .initial-notice { background: #d4edda; padding: 15px; margin: 10px 0; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h2>IP Address Change Alert</h2>
+        <h2>{{if .IsInitial}}IP Monitor Initial State{{else}}IP Address Change Alert{{end}}</h2>
     </div>
     <div class="content">
         <p><strong>Host:</strong> {{.Hostname}}</p>
         <p><strong>Interface:</strong> {{.Interface}}</p>
         <p><strong>Time:</strong> {{.UpdatedAt.Format "2006-01-02 15:04:05"}}</p>
 
+        {{if .IsInitial}}
+        <div class="initial-notice">
+            <h3>Initial State Notification</h3>
+            <p>IP Monitor has started. This is the current network configuration.</p>
+        </div>
+        {{else}}
         <div class="changes">
             <h3>Changes Detected:</h3>
             <ul>
@@ -63,6 +71,7 @@ const emailTemplate = `
             {{end}}
             </ul>
         </div>
+        {{end}}
 
         <h3>Current State:</h3>
         <div class="ip-group">
@@ -111,7 +120,7 @@ func NewEmailNotifier(config *config.Email) (*EmailNotifier, error) {
 }
 
 // Send sends an email notification about IP changes
-func (n *EmailNotifier) Send(oldState, newState types.IPState, changes []string, iface string) error {
+func (n *EmailNotifier) Send(oldState, newState types.IPState, changes []string, iface string, isInitial bool) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "unknown"
@@ -125,6 +134,7 @@ func (n *EmailNotifier) Send(oldState, newState types.IPState, changes []string,
 		OldState:  oldState,
 		NewState:  newState,
 		UpdatedAt: time.Now(),
+		IsInitial: isInitial,
 	}
 
 	// Render email template
@@ -133,10 +143,15 @@ func (n *EmailNotifier) Send(oldState, newState types.IPState, changes []string,
 		return fmt.Errorf("failed to render email template: %w", err)
 	}
 
+	subject := "IP Address Change Alert - %s"
+	if isInitial {
+		subject = "IP Monitor Started - Initial State - %s"
+	}
+
 	// Prepare email message
 	msg := fmt.Sprintf("From: %s\r\n"+
 		"To: %s\r\n"+
-		"Subject: IP Address Change Alert - %s\r\n"+
+		"Subject: "+subject+"\r\n"+
 		"MIME-Version: 1.0\r\n"+
 		"Content-Type: text/html; charset=UTF-8\r\n"+
 		"\r\n%s",
@@ -155,7 +170,6 @@ func (n *EmailNotifier) Send(oldState, newState types.IPState, changes []string,
 			n.config.SMTPServer)
 		addr = fmt.Sprintf("%s:%d", n.config.SMTPServer, n.config.SMTPPort)
 	} else {
-		auth = nil
 		addr = fmt.Sprintf("%s:%d", n.config.SMTPServer, n.config.SMTPPort)
 	}
 

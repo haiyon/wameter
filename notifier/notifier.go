@@ -50,16 +50,19 @@ func NewNotifier(cfg *config.Config, logger *zap.Logger) (*Notifier, error) {
 func (m *Notifier) NotifyIPChange(oldState, newState types.IPState, changes []string) error {
 	var errs []error
 
+	// Check if this is an initial notification
+	isInitial := len(oldState.IPv4) == 0 && len(oldState.IPv6) == 0 && oldState.ExternalIP == ""
+
 	// Send email notification
 	if m.email != nil {
-		if err := m.email.Send(oldState, newState, changes, m.config.NetworkInterface); err != nil {
+		if err := m.email.Send(oldState, newState, changes, m.config.NetworkInterface, isInitial); err != nil {
 			errs = append(errs, fmt.Errorf("email notification failed: %w", err))
 		}
 	}
 
 	// Send telegram notification
 	if m.telegram != nil {
-		if err := m.telegram.Send(oldState, newState, changes); err != nil {
+		if err := m.telegram.Send(oldState, newState, changes, isInitial); err != nil {
 			errs = append(errs, fmt.Errorf("telegram notification failed: %w", err))
 		}
 	}
