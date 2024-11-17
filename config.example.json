@@ -26,13 +26,18 @@
     "username": "your-email@example.com",
     "password": "your-password",
     "from": "your-email@example.com",
-    "to": ["recipient@example.com"],
+    "to": [
+      "recipient@example.com"
+    ],
     "use_tls": true
   },
   "telegram": {
     "enabled": false,
     "bot_token": "your-bot-token",
-    "chat_ids": ["chat-id-1", "chat-id-2"]
+    "chat_ids": [
+      "chat-id-1",
+      "chat-id-2"
+    ]
   },
   "log": {
     "directory": "./logs",

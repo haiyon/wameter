@@ -1,6 +1,7 @@
 # IP Monitor
 
-IP Monitor is a versatile IP address monitoring tool that tracks both internal and external IP address changes and provides notifications through multiple channels. It supports ESXi, Linux, macOS, and Windows platforms.
+IP Monitor is a versatile IP address monitoring tool that tracks both internal and external IP address changes and
+provides notifications through multiple channels. It supports ESXi, Linux, macOS, and Windows platforms.
 
 ## Features
 
@@ -148,14 +149,13 @@ Example configuration:
 ```json
 {
   "check_interval": 300,
-  "network_interface": "eth0", // or "en0" for macOS, "Local Area Connection" for Windows
+  "network_interface": "eth0",
   "check_external_ip": true,
   "external_ip_providers": [
     "https://api.ipify.org",
     "https://ifconfig.me/ip",
     "https://icanhazip.com"
   ],
-
   "email": {
     "enabled": false,
     "smtp_server": "smtp.example.com",
@@ -163,18 +163,21 @@ Example configuration:
     "username": "your-email@example.com",
     "password": "your-password",
     "from": "your-email@example.com",
-    "to": ["recipient@example.com"],
+    "to": [
+      "recipient@example.com"
+    ],
     "use_tls": true
   },
-
   "telegram": {
     "enabled": false,
     "bot_token": "your-bot-token",
-    "chat_ids": ["chat-id-1", "chat-id-2"]
+    "chat_ids": [
+      "chat-id-1",
+      "chat-id-2"
+    ]
   },
-
   "log": {
-    "directory": "/var/log/ip-monitor", // Use C:\ProgramData\ip-monitor\logs for Windows
+    "directory": "/var/log/ip-monitor",
     "max_size": 100,
     "max_backups": 3,
     "max_age": 28,
