@@ -139,6 +139,47 @@ create_directories() {
     chmod 755 "$LOG_DIR"
 }
 
+# Get default interface
+get_default_interface() {
+    local interface=""
+
+    # Use route command to get the default interface
+    if command -v ip &> /dev/null; then
+        interface=$(ip route | grep default | head -n1 | awk '{print $5}')
+    fi
+
+    # If still not found, use route command
+    if [ -z "$interface" ] && command -v route &> /dev/null; then
+        interface=$(route -n | grep '^0.0.0.0' | head -n1 | awk '{print $8}')
+    fi
+
+    # If still not found, check /sys/class/net
+    if [ -z "$interface" ]; then
+       	# Check some common interface names
+        for iface in eth0 eth1 en0 en1 ens32 ens33 enp0s3 enp0s8; do
+            if [ -d "/sys/class/net/$iface" ] && [ "$(cat /sys/class/net/$iface/operstate)" = "up" ]; then
+                interface=$iface
+                break
+            fi
+        done
+    fi
+
+		# If still not found, use lo interface
+    if [ -z "$interface" ]; then
+        interface=$(ls /sys/class/net/ | grep -v lo | head -n1)
+    fi
+
+		# If still not found, use eth0
+    if [ -z "$interface" ]; then
+        interface="eth0"
+        print_warn "No active network interface found, using default: eth0"
+    else
+        print_info "Detected network interface: $interface"
+    fi
+
+    echo "$interface"
+}
+
 # Install files
 install_files() {
     print_info "Installing binary..."
@@ -148,10 +189,12 @@ install_files() {
     print_info "Installing config file..."
     if [ ! -f "$CONFIG_DIR/config.json" ]; then
         # If config file doesn't exist, create it, full config reference: config.example.json
+        local default_interface=$(get_default_interface)
+				print_info "Creating default config with interface: $default_interface"
         cat > "$CONFIG_DIR/config.json" <<EOF
 {
   "check_interval": 300,
-  "network_interface": "eth0",
+  "network_interface": "${default_interface}",
   "ip_version": {
     "enable_ipv4": true,
     "enable_ipv6": true,
