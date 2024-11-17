@@ -211,7 +211,12 @@ func validateInterface(ifaceName string) error {
 
 	iface, err := net.InterfaceByName(ifaceName)
 	if err != nil {
-		return fmt.Errorf("interface %s not found: %w", ifaceName, err)
+		availableIfaces, _ := net.Interfaces() // Get all available interfaces
+		ifaceNames := make([]string, len(availableIfaces))
+		for i, iface := range availableIfaces {
+			ifaceNames[i] = iface.Name
+		}
+		return fmt.Errorf("interface %s not found. Available interfaces: %v", ifaceName, ifaceNames)
 	}
 
 	if iface.Flags&net.FlagUp == 0 {
