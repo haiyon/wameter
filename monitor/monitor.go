@@ -337,12 +337,20 @@ func (m *Monitor) getExternalIP(ctx context.Context) (string, error) {
 	var providers []string
 	ipVersion := "ipv4"
 
-	if m.config.IPVersion.PreferIPv6 && m.config.IPVersion.EnableIPv6 {
-		providers = m.config.ExternalIPProviders.IPv6
-		ipVersion = "ipv6"
-	} else if m.config.IPVersion.EnableIPv4 {
+	if m.config.IPVersion.EnableIPv6 {
+		if m.config.IPVersion.PreferIPv6 || !m.config.IPVersion.EnableIPv4 {
+			providers = m.config.ExternalIPProviders.IPv6
+			ipVersion = "ipv6"
+			m.logger.Debug("Using IPv6 providers for external IP check",
+				zap.Strings("providers", providers))
+		}
+	}
+
+	if len(providers) == 0 && m.config.IPVersion.EnableIPv4 {
 		providers = m.config.ExternalIPProviders.IPv4
 		ipVersion = "ipv4"
+		m.logger.Debug("Using IPv4 providers for external IP check",
+			zap.Strings("providers", providers))
 	}
 
 	if len(providers) == 0 {
@@ -399,6 +407,7 @@ func (m *Monitor) getExternalIP(ctx context.Context) (string, error) {
 				if count := ips[r.ip]; count >= 2 {
 					m.logger.Debug("External IP consensus reached",
 						zap.String("ip", r.ip),
+						zap.String("version", ipVersion),
 						zap.Int("agreements", count))
 					return r.ip, nil
 				}
@@ -416,6 +425,10 @@ func (m *Monitor) getExternalIP(ctx context.Context) (string, error) {
 							maxCount = count
 						}
 					}
+					m.logger.Debug("Using most reported external IP",
+						zap.String("ip", mostFrequentIP),
+						zap.String("version", ipVersion),
+						zap.Int("reports", maxCount))
 					return mostFrequentIP, nil
 				}
 				// All providers failed
@@ -466,7 +479,8 @@ func (m *Monitor) fetchExternalIP(ctx context.Context, provider string) (string,
 	ip := strings.TrimSpace(string(body))
 
 	// Validate IP based on version
-	if m.config.IPVersion.PreferIPv6 && m.config.IPVersion.EnableIPv6 {
+	isIPv6Request := strings.Contains(provider, "6") || m.config.IPVersion.PreferIPv6
+	if isIPv6Request {
 		if !utils.IsValidIP(ip, true) {
 			return "", time.Since(start), fmt.Errorf("invalid IPv6 address: %s", ip)
 		}
