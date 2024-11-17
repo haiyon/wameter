@@ -53,14 +53,14 @@ func NewTelegramNotifier(config *config.Telegram) (*TelegramNotifier, error) {
 }
 
 // Send sends a Telegram notification about IP changes
-func (n *TelegramNotifier) Send(oldState, newState types.IPState, changes []string, isInitial bool) error {
+func (n *TelegramNotifier) Send(oldState, newState types.IPState, changes []string, opts notificationOptions) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "unknown"
 	}
 
 	// Prepare message text
-	message := formatTelegramMessage(hostname, &oldState, &newState, changes, isInitial)
+	message := formatTelegramMessage(hostname, &oldState, &newState, changes, opts)
 
 	// Send to all configured chat IDs
 	var lastErr error
@@ -96,10 +96,10 @@ func (n *TelegramNotifier) sendMessage(chatID, text string) error {
 }
 
 // formatTelegramMessage formats a message for Telegram
-func formatTelegramMessage(hostname string, oldState, newState *types.IPState, changes []string, isInitial bool) string {
+func formatTelegramMessage(hostname string, _, newState *types.IPState, changes []string, opts notificationOptions) string {
 	var b strings.Builder
 
-	if isInitial {
+	if opts.isInitial {
 		b.WriteString("*IP Monitor Started - Initial State*\n\n")
 	} else {
 		b.WriteString("*IP Address Change Alert*\n\n")
@@ -108,7 +108,7 @@ func formatTelegramMessage(hostname string, oldState, newState *types.IPState, c
 	b.WriteString(fmt.Sprintf("*Host:* `%s`\n", hostname))
 	b.WriteString(fmt.Sprintf("*Time:* `%s`\n\n", time.Now().Format("2006-01-02 15:04:05")))
 
-	if isInitial {
+	if opts.isInitial {
 		b.WriteString("*Initial Configuration:*\n")
 	} else {
 		b.WriteString("*Changes:*\n")
@@ -119,21 +119,21 @@ func formatTelegramMessage(hostname string, oldState, newState *types.IPState, c
 	b.WriteString("\n")
 
 	b.WriteString("*Current State:*\n")
-	if len(newState.IPv4) > 0 {
+	if opts.showIPv4 && len(newState.IPv4) > 0 {
 		b.WriteString("\nIPv4 Addresses:\n")
 		for _, ip := range newState.IPv4 {
 			b.WriteString(fmt.Sprintf("• `%s`\n", ip))
 		}
 	}
 
-	if len(newState.IPv6) > 0 {
+	if opts.showIPv6 && len(newState.IPv6) > 0 {
 		b.WriteString("\nIPv6 Addresses:\n")
 		for _, ip := range newState.IPv6 {
 			b.WriteString(fmt.Sprintf("• `%s`\n", ip))
 		}
 	}
 
-	if newState.ExternalIP != "" {
+	if opts.showExternal && newState.ExternalIP != "" {
 		b.WriteString(fmt.Sprintf("\nExternal IP: `%s`\n", newState.ExternalIP))
 	}
 

@@ -208,7 +208,6 @@ func (m *Monitor) initialCheck() error {
 			zap.String("interface", m.config.NetworkInterface))
 	}
 
-	m.logger.Info("Sent initial IP state notification")
 	return nil
 }
 

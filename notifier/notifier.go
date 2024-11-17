@@ -50,19 +50,18 @@ func NewNotifier(cfg *config.Config, logger *zap.Logger) (*Notifier, error) {
 func (m *Notifier) NotifyIPChange(oldState, newState types.IPState, changes []string) error {
 	var errs []error
 
-	// Check if this is an initial notification
-	isInitial := len(oldState.IPv4) == 0 && len(oldState.IPv6) == 0 && oldState.ExternalIP == ""
+	opts := getNotificationOptions(m.config, len(oldState.IPv4) == 0 && len(oldState.IPv6) == 0)
 
 	// Send email notification
 	if m.email != nil {
-		if err := m.email.Send(oldState, newState, changes, m.config.NetworkInterface, isInitial); err != nil {
+		if err := m.email.Send(oldState, newState, changes, m.config.NetworkInterface, opts); err != nil {
 			errs = append(errs, fmt.Errorf("email notification failed: %w", err))
 		}
 	}
 
 	// Send telegram notification
 	if m.telegram != nil {
-		if err := m.telegram.Send(oldState, newState, changes, isInitial); err != nil {
+		if err := m.telegram.Send(oldState, newState, changes, opts); err != nil {
 			errs = append(errs, fmt.Errorf("telegram notification failed: %w", err))
 		}
 	}
@@ -72,4 +71,22 @@ func (m *Notifier) NotifyIPChange(oldState, newState types.IPState, changes []st
 	}
 
 	return nil
+}
+
+// notificationOptions holds options for sending notifications
+type notificationOptions struct {
+	showIPv4     bool
+	showIPv6     bool
+	showExternal bool
+	isInitial    bool
+}
+
+// getNotificationOptions returns options for sending notifications
+func getNotificationOptions(cfg *config.Config, isInitial bool) notificationOptions {
+	return notificationOptions{
+		showIPv4:     cfg.IPVersion.EnableIPv4,
+		showIPv6:     cfg.IPVersion.EnableIPv6,
+		showExternal: cfg.CheckExternalIP,
+		isInitial:    isInitial,
+	}
 }
