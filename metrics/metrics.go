@@ -5,8 +5,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/haiyon/ip-monitor/types"
-	"github.com/haiyon/ip-monitor/utils"
+	"ip-monitor/types"
+	"ip-monitor/utils"
 )
 
 // Metrics represents monitoring metrics

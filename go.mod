@@ -1,4 +1,4 @@
-module github.com/haiyon/ip-monitor
+module ip-monitor
 
 go 1.23.3
 

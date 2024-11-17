@@ -9,19 +9,30 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/haiyon/ip-monitor/config"
-	"github.com/haiyon/ip-monitor/monitor"
+	"ip-monitor/config"
+	"ip-monitor/monitor"
+
 	"go.uber.org/zap"
+)
+
+const (
+	Version   = "unknown"
+	GitCommit = "unknown"
+	BuildDate = "unknown"
 )
 
 func main() {
 	// Parse command line flags
 	configPath := flag.String("config", "", "Path to config file")
 	debug := flag.Bool("debug", false, "Enable debug logging")
+	versionFlag := flag.Bool("version", false, "Show version information")
 	flag.Parse()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	// Show version information
+	if *versionFlag {
+		fmt.Printf("Version: %s\nGitCommit: %s\nBuildDate: %s\n", Version, GitCommit, BuildDate)
+		os.Exit(0)
+	}
 
 	// Initialize logger
 	logConfig := zap.NewProductionConfig()
@@ -50,6 +61,9 @@ func main() {
 	if *debug {
 		cfg.Debug = true
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// Create and start monitor
 	m, err := monitor.NewMonitor(ctx, cfg, logger)

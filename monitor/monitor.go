@@ -12,11 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/haiyon/ip-monitor/config"
-	"github.com/haiyon/ip-monitor/metrics"
-	"github.com/haiyon/ip-monitor/notifier"
-	"github.com/haiyon/ip-monitor/types"
-	"github.com/haiyon/ip-monitor/utils"
+	"ip-monitor/config"
+	"ip-monitor/metrics"
+	"ip-monitor/notifier"
+	"ip-monitor/types"
+	"ip-monitor/utils"
+
 	"go.uber.org/zap"
 )
 

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/haiyon/ip-monitor/config"
-	"github.com/haiyon/ip-monitor/types"
-	"github.com/haiyon/ip-monitor/utils"
+	"ip-monitor/config"
+	"ip-monitor/types"
+	"ip-monitor/utils"
 )
 
 // EmailNotifier handles email notifications
