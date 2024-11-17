@@ -1,0 +1,9 @@
+.idea/
+.vscode/
+.DS_Store
+logs/*
+/.VSCodeCounter/
+
+# config
+!config.example.yaml
+config.yaml

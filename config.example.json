@@ -1,0 +1,70 @@
+{
+  "check_interval": 300,
+  "network_interface": "eth0",
+  "ip_version": {
+    "enable_ipv4": true,
+    "enable_ipv6": true,
+    "prefer_ipv6": false
+  },
+  "check_external_ip": true,
+  "external_ip_providers": {
+    "ipv4": [
+      "https://api.ipify.org",
+      "https://ifconfig.me/ip",
+      "https://icanhazip.com"
+    ],
+    "ipv6": [
+      "https://api6.ipify.org",
+      "https://v6.ident.me",
+      "https://api6.my-ip.io/ip"
+    ]
+  },
+  "email": {
+    "enabled": false,
+    "smtp_server": "smtp.example.com",
+    "smtp_port": 587,
+    "username": "your-email@example.com",
+    "password": "your-password",
+    "from": "your-email@example.com",
+    "to": ["recipient@example.com"],
+    "use_tls": true
+  },
+
+  "telegram": {
+    "enabled": false,
+    "bot_token": "your-bot-token",
+    "chat_ids": ["chat-id-1", "chat-id-2"]
+  },
+
+  "log": {
+    "directory": "/var/log/ip-monitor",
+    "max_size": 100,
+    "max_backups": 3,
+    "max_age": 28,
+    "compress": true,
+    "level": "info"
+  },
+
+  "retry": {
+    "max_attempts": 3,
+    "initial_delay": "1s",
+    "max_delay": "30s"
+  },
+
+  "monitoring": {
+    "http_timeout": "10s",
+    "dial_timeout": "5s",
+    "keep_alive": "30s",
+    "idle_timeout": "90s",
+    "max_idle_conns": 100,
+    "max_idle_conns_per_host": 10
+  },
+
+  "last_ip_file": "/var/log/ip-monitor/last_ip.json",
+  "debug": false,
+
+  "security": {
+    "file_mode": "0644",
+    "dir_mode": "0755"
+  }
+}
