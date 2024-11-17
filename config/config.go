@@ -61,6 +61,7 @@ type Telegram struct {
 // LogConfig represents logging configuration
 type LogConfig struct {
 	Directory       string `json:"directory"`         // Log directory
+	Filename        string `json:"filename"`          // Log filename
 	MaxSize         int    `json:"max_size"`          // Maximum size of log file in MB
 	MaxBackups      int    `json:"max_backups"`       // Maximum number of old log files
 	MaxAge          int    `json:"max_age"`           // Maximum days to retain old log files
@@ -331,6 +332,11 @@ func validateTelegramConfig(config *Telegram) error {
 func validateLogConfig(config *LogConfig) error {
 	if config.Directory == "" {
 		return fmt.Errorf("log directory cannot be empty")
+	}
+
+	if config.Filename == "" {
+		// Use default filename
+		config.Filename = "ip_monitor.log"
 	}
 
 	// Create log directory if it doesn't exist

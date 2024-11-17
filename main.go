@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 	"ip-monitor/monitor"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 const (
@@ -34,28 +37,22 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Initialize logger
-	logConfig := zap.NewProductionConfig()
-	if *debug {
-		logConfig = zap.NewDevelopmentConfig()
+	// Load configuration
+	cfg, err := config.LoadConfig(*configPath)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		os.Exit(1)
 	}
-	logger, err := logConfig.Build()
+
+	// Initialize logger
+	logger, err := setupLogger(cfg, *debug)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
 		os.Exit(1)
 	}
-	defer func(logger *zap.Logger) {
-		err := logger.Sync()
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "Failed to sync logger: %v\n", err)
-		}
-	}(logger)
-
-	// Load configuration
-	cfg, err := config.LoadConfig(*configPath)
-	if err != nil {
-		logger.Fatal("Failed to load config", zap.Error(err))
-	}
+	defer func() {
+		_ = logger.Sync()
+	}()
 
 	// Override debug setting if specified
 	if *debug {
@@ -100,4 +97,92 @@ func main() {
 		logger.Error("Shutdown error", zap.Error(err))
 		os.Exit(1)
 	}
+}
+
+// setupLogger creates a logger with file and console output
+func setupLogger(cfg *config.Config, debug bool) (*zap.Logger, error) {
+	// Create log directory if it doesn't exist
+	if err := os.MkdirAll(cfg.LogConfig.Directory, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	}
+
+	// Configure log rotation
+	logFile := &lumberjack.Logger{
+		Filename:   filepath.Join(cfg.LogConfig.Directory, cfg.LogConfig.Filename),
+		MaxSize:    cfg.LogConfig.MaxSize,    // MB
+		MaxBackups: cfg.LogConfig.MaxBackups, // files
+		MaxAge:     cfg.LogConfig.MaxAge,     // days
+		Compress:   cfg.LogConfig.Compress,
+		LocalTime:  cfg.LogConfig.UseLocalTime,
+	}
+
+	// Set log level
+	var level zapcore.Level
+	switch cfg.LogConfig.LogLevel {
+	case "debug":
+		level = zapcore.DebugLevel
+	case "info":
+		level = zapcore.InfoLevel
+	case "warn":
+		level = zapcore.WarnLevel
+	case "error":
+		level = zapcore.ErrorLevel
+	default:
+		level = zapcore.InfoLevel
+	}
+
+	// Force debug level if debug flag is set
+	if debug {
+		level = zapcore.DebugLevel
+	}
+
+	// Configure encoders
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "time",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeLevel:    zapcore.LowercaseLevelEncoder,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+	}
+
+	// Use custom time format if specified
+	if cfg.LogConfig.TimeFormat != "" {
+		timeFormat := cfg.LogConfig.TimeFormat
+		encoderConfig.EncodeTime = func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+			enc.AppendString(t.Format(timeFormat))
+		}
+	}
+
+	// Create console encoder
+	consoleEncoder := zapcore.NewConsoleEncoder(encoderConfig)
+
+	// Create JSON encoder for file
+	fileEncoder := zapcore.NewJSONEncoder(encoderConfig)
+
+	// Create core with both console and file output
+	core := zapcore.NewTee(
+		// Console output
+		zapcore.NewCore(
+			consoleEncoder,
+			zapcore.AddSync(os.Stdout),
+			level,
+		),
+		// File output
+		zapcore.NewCore(
+			fileEncoder,
+			zapcore.AddSync(logFile),
+			level,
+		),
+	)
+
+	// Create logger
+	logger := zap.New(core,
+		zap.AddStacktrace(zapcore.ErrorLevel),
+	)
+
+	return logger, nil
 }
