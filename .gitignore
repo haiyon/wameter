@@ -5,5 +5,5 @@ logs/*
 /.VSCodeCounter/
 
 # config
-!config.example.yaml
-config.yaml
+!config.example.json
+config.json
