@@ -196,6 +196,9 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	// Set default last IP file
+	c.LastIPFile = filepath.Join(c.LogConfig.Directory, "last_ip.json")
+
 	// Validate log configuration
 	if err := validateLogConfig(&c.LogConfig); err != nil {
 		return fmt.Errorf("invalid log configuration: %w", err)

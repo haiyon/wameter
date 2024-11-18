@@ -40,7 +40,7 @@
     ]
   },
   "log": {
-    "directory": "./logs",
+    "directory": "/var/log/ipm",
     "filename": "ip_monitor.log",
     "max_size": 100,
     "max_backups": 3,
@@ -61,10 +61,5 @@
     "max_idle_conns": 100,
     "max_idle_conns_per_host": 10
   },
-  "last_ip_file": "./logs/last_ip.json",
-  "debug": false,
-  "security": {
-    "file_mode": "0644",
-    "dir_mode": "0755"
-  }
+  "debug": false
 }
