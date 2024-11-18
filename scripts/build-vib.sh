@@ -45,7 +45,7 @@ check_dependencies() {
 	local missing_deps=()
 
 	# Required tools
-	local tools=("go" "vibauthor" "tar" "gzip")
+	local tools=("go" "docker" "tar" "gzip")
 
 	for tool in "${tools[@]}"; do
 		if ! command -v "$tool" >/dev/null 2>&1; then
@@ -58,6 +58,12 @@ check_dependencies() {
 		echo "Please install them before continuing."
 		exit 1
 	fi
+
+	# Check Docker is running
+  if ! docker info >/dev/null 2>&1; then
+		echo "Docker daemon is not running. Please start Docker."
+		exit 1
+  fi
 
 	# Check Go version
 	local go_version
@@ -260,12 +266,9 @@ create_descriptor() {
 	</urls>
 	<relationships>
 		<provides>
-			<name>IPMonitor</name>
-			<version>${VERSION}-${BUILD}</version>
+				<name>IPMonitor</name>
+				<version>${VERSION}-${BUILD}</version>
 		</provides>
-		<requires>
-			<constraint name="VMware-ESXi-8.0.0" relation=">="/>
-		</requires>
 	</relationships>
 	<software-tags>
 		<tag>service</tag>
@@ -288,19 +291,22 @@ create_descriptor() {
 EOF
 }
 
-# Build VIB package
+# Build VIB package using Docker
 build_vib() {
-	echo "Creating VIB package..."
+	echo "Creating VIB package using Docker..."
 
 	# Create payload archive
 	cd "${PAYLOAD_DIR}"
 	tar czf "${STAGE_DIR}/payload.tgz" ./*
 
-	# Create VIB
+	# Create VIB using Docker
 	cd "${STAGE_DIR}"
-	vibauthor -C -t . -v "${NAME}-${VERSION}-${BUILD}.vib" -f
+	docker run --rm \
+		-v "$(pwd):/root" \
+		lamw/vibauthor \
+		vibauthor -C -t "/root" -v "${NAME}-${VERSION}-${BUILD}.vib" -f
 
-	# Copy final VIB to output directory
+	# Create output directory and copy VIB
 	mkdir -p "${ROOT_DIR}/dist"
 	cp "${NAME}-${VERSION}-${BUILD}.vib" "${ROOT_DIR}/dist/"
 
