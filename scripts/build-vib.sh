@@ -101,6 +101,7 @@ build_binary() {
 							-X main.Version=${VERSION} \
 							-X main.GitCommit=${GIT_COMMIT} \
 							-X main.BuildDate=${BUILD_DATE}" \
+		-trimpath \
 		./main.go
 
 	# Strip binary
