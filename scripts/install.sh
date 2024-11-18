@@ -37,7 +37,8 @@ check_root() {
 
 # Get system architecture
 get_arch() {
-	local arch=$(uname -m)
+	local arch
+	arch=$(uname -m)
 	case $arch in
 		x86_64) echo "amd64" ;;
 		aarch64) echo "arm64" ;;
@@ -89,8 +90,9 @@ check_and_build() {
 
 # Check binary architecture
 check_binary_arch() {
-	local binary_arch=$(file "$BINARY_NAME" | grep -o "x86-64\|aarch64\|ARM")
-	local system_arch=$(uname -m)
+	local binary_arch, system_arch
+	binary_arch=$(file "$BINARY_NAME" | grep -o "x86-64\|aarch64\|ARM")
+	system_arch=$(uname -m)
 
 	case "$binary_arch" in
 		"x86-64")
@@ -169,80 +171,13 @@ install_files() {
 	print_info "Installing config file..."
 	if [ ! -f "$CONFIG_DIR/config.json" ]; then
 		# If config file doesn't exist, create it, full config reference: config.example.json
-		local default_interface=$(get_default_interface)
+		local default_interface
+		default_interface=$(get_default_interface)
 		print_info "Creating default config with interface: $default_interface"
-		cat > "$CONFIG_DIR/config.json" <<EOF
-{
-  "check_interval": 300,
-  "network_interface": "${default_interface}",
-  "ip_version": {
-    "enable_ipv4": true,
-    "enable_ipv6": true,
-    "prefer_ipv6": false
-  },
-  "check_external_ip": true,
-  "external_ip_providers": {
-    "ipv4": [
-      "https://api.ipify.org",
-      "https://ifconfig.me/ip",
-      "https://icanhazip.com"
-    ],
-    "ipv6": [
-      "https://api6.ipify.org",
-      "https://v6.ident.me",
-      "https://api6.my-ip.io/ip"
-    ]
-  },
-  "email": {
-    "enabled": false,
-    "smtp_server": "smtp.example.com",
-    "smtp_port": 587,
-    "username": "your-email@example.com",
-    "password": "your-password",
-    "from": "your-email@example.com",
-    "to": [
-      "recipient@example.com"
-    ],
-    "use_tls": true
-  },
-  "telegram": {
-    "enabled": false,
-    "bot_token": "your-bot-token",
-    "chat_ids": [
-      "chat-id-1",
-      "chat-id-2"
-    ]
-  },
-  "log": {
-    "directory": "/var/log/ipm",
-    "filename": "ip_monitor.log",
-    "max_size": 100,
-    "max_backups": 3,
-    "max_age": 28,
-    "compress": true,
-    "level": "info"
-  },
-  "retry": {
-    "max_attempts": 3,
-    "initial_delay": "1s",
-    "max_delay": "30s"
-  },
-  "monitoring": {
-    "http_timeout": "10s",
-    "dial_timeout": "5s",
-    "keep_alive": "30s",
-    "idle_timeout": "90s",
-    "max_idle_conns": 100,
-    "max_idle_conns_per_host": 10
-  },
-  "last_ip_file": "/var/log/ipm/last_ip.json",
-  "debug": false,
-  "security": {
-    "file_mode": "0644",
-    "dir_mode": "0755"
-  }
-}
-EOF
+		# Create the config.json file as a copy of config.example.json first
+		cp "$CONFIG_DIR/config.example.json" "$CONFIG_DIR/config.json"
+		# Replace network_interface value in the config file
+		sed -i "s/\"network_interface\": \"[^\"]*\"/\"network_interface\": \"$default_interface\"/" "$CONFIG_DIR/config.json"
 	else
 		print_warn "Config file already exists, skipping..."
 	fi
