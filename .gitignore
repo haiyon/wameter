@@ -3,6 +3,11 @@
 .DS_Store
 logs/*
 /.VSCodeCounter/
+build/
+dist/
+
+ipm
+ip-monitor
 
 # config
 !config.example.json
