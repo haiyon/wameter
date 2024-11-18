@@ -34,6 +34,9 @@ provides notifications through multiple channels. It supports ESXi, Linux, macOS
 │   ├── notifier.go        # Notification interface and manager
 │   ├── email.go           # Email notification implementation
 │   └── telegram.go        # Telegram notification implementation
+├── scripts/                # Utility scripts
+│   ├── install.sh         # Installation script for linux
+│   └── build-vib.sh       # VIB package build script for ESXi
 ├── types/                 # Data types
 │   └── types.go           # Common data types
 └── utils/                 # Utility functions
