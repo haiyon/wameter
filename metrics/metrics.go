@@ -4,9 +4,6 @@ import (
 	"encoding/json"
 	"sync"
 	"time"
-
-	"ip-monitor/types"
-	"ip-monitor/utils"
 )
 
 // Metrics represents monitoring metrics
@@ -47,18 +44,6 @@ type ProviderStats struct {
 	AverageResponseTime time.Duration `json:"average_response_time"`
 	LastSuccess         time.Time     `json:"last_success"`
 	LastError           string        `json:"last_error"`
-}
-
-// NetworkMetrics tracks network interface metrics
-type NetworkMetrics struct {
-	IPv4AddressCount    int       `json:"ipv4_address_count"`
-	IPv6AddressCount    int       `json:"ipv6_address_count"`
-	InterfaceStatus     string    `json:"interface_status"`
-	LastInterfaceCheck  time.Time `json:"last_interface_check"`
-	ConsecutiveFailures int64     `json:"consecutive_failures"`
-	UptimeSeconds       int64     `json:"uptime_seconds"`
-	InterfaceSpeed      int64     `json:"interface_speed"`
-	InterfaceErrors     int64     `json:"interface_errors"`
 }
 
 // NewMetrics creates a new Metrics instance
@@ -131,47 +116,6 @@ func (m *Metrics) RecordProviderRequest(ipVersion string, provider string, durat
 	totalTime := stats.AverageResponseTime.Nanoseconds() * (stats.Requests - 1)
 	totalTime += duration.Nanoseconds()
 	stats.AverageResponseTime = time.Duration(totalTime / stats.Requests)
-}
-
-// RecordIPChange records IP address changes
-func (m *Metrics) RecordIPChange(oldState, newState *types.IPState) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.IPChanges.LastChangeTime = time.Now()
-	m.IPChanges.TotalChanges++
-
-	// Compare IPv4 addresses
-	if !utils.StringSlicesEqual(oldState.IPv4, newState.IPv4) {
-		m.IPChanges.IPv4Changes++
-	}
-
-	// Compare IPv6 addresses
-	if !utils.StringSlicesEqual(oldState.IPv6, newState.IPv6) {
-		m.IPChanges.IPv6Changes++
-	}
-
-	// Compare external IP
-	if oldState.ExternalIP != newState.ExternalIP {
-		m.IPChanges.ExternalIPChanges++
-	}
-
-	// Calculate changes per day
-	duration := time.Since(m.StartTime)
-	days := duration.Hours() / 24
-	if days > 0 {
-		m.IPChanges.ChangesPerDay = float64(m.IPChanges.TotalChanges) / days
-	}
-}
-
-// UpdateNetworkStats updates network interface metrics
-func (m *Metrics) UpdateNetworkStats(state *types.IPState) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.NetworkStats.IPv4AddressCount = len(state.IPv4)
-	m.NetworkStats.IPv6AddressCount = len(state.IPv6)
-	m.NetworkStats.LastInterfaceCheck = time.Now()
 }
 
 // GetSnapshot returns a copy of current metrics
