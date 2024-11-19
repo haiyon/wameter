@@ -9,7 +9,12 @@ import (
 	"path/filepath"
 )
 
-const appName = "wameter"
+var (
+	AppName   = "wameter"
+	Version   = "unknown"
+	GitCommit = "unknown"
+	BuildDate = "unknown"
+)
 
 // Config represents the application configuration
 type Config struct {
@@ -399,14 +404,14 @@ func getConfigPaths() []string {
 	paths := []string{
 		// 1. current directory
 		"config.json",
-		fmt.Sprintf("./%s.json", appName),
+		fmt.Sprintf("./%s.json", AppName),
 
 		// 2. User configuration directory (~/.config/wameter/config.json)
-		filepath.Join(homeDir, ".config", appName, "config.json"),
+		filepath.Join(homeDir, ".config", AppName, "config.json"),
 
 		// 3. System configuration directory
-		fmt.Sprintf("/etc/%s/config.json", appName),
-		fmt.Sprintf("/etc/%s.json", appName),
+		fmt.Sprintf("/etc/%s/config.json", AppName),
+		fmt.Sprintf("/etc/%s.json", AppName),
 
 		// 4. Current directory
 		filepath.Join(filepath.Dir(os.Args[0]), "config.json"),

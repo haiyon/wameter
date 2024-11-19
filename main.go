@@ -18,12 +18,6 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-const (
-	Version   = "unknown"
-	GitCommit = "unknown"
-	BuildDate = "unknown"
-)
-
 func main() {
 	// Parse command line flags
 	configPath := flag.String("config", "", "Path to config file")
@@ -33,7 +27,7 @@ func main() {
 
 	// Show version information
 	if *versionFlag {
-		fmt.Printf("Version: %s\nGitCommit: %s\nBuildDate: %s\n", Version, GitCommit, BuildDate)
+		fmt.Printf("Version: %s\nGitCommit: %s\nBuildDate: %s\n", config.Version, config.GitCommit, config.BuildDate)
 		os.Exit(0)
 	}
 

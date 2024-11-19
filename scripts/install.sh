@@ -32,6 +32,7 @@ else
     SYSTEMD_DIR="/etc/systemd/system"
 fi
 
+MODULE_NAME="github.com/haiyon/wameter"
 BINARY_NAME="wameter"
 SERVICE_NAME=$BINARY_NAME
 
@@ -115,9 +116,10 @@ check_and_build() {
 
         if ! go build -o "$BINARY_NAME" \
             -ldflags "-s -w \
-                      -X main.Version=${VERSION} \
-                      -X main.GitCommit=${GIT_COMMIT} \
-                      -X main.BuildDate=${BUILD_DATE}"; then
+                      -X ${MODULE_NAME}/config.AppName=${SERVICE_NAME} \
+                      -X ${MODULE_NAME}/config.Version=${VERSION} \
+                      -X ${MODULE_NAME}/config.GitCommit=${GIT_COMMIT} \
+                      -X ${MODULE_NAME}/config.BuildDate=${BUILD_DATE}"; then
             print_error "Build failed"
             exit 1
         fi
