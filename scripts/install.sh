@@ -393,8 +393,8 @@ main() {
         exit 0
         ;;
     "")
-        check_root
         check_and_build
+        check_root
         create_directories
         install_files
         create_service
