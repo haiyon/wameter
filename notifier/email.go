@@ -51,24 +51,21 @@ const emailTemplate = `
         .ip-group { margin: 10px 0; }
         .ip-group h4 { margin: 5px 0; }
         .ip-list { margin: 5px 0; padding-left: 20px; }
-        .initial-notice { background: #d4edda; padding: 15px; margin: 10px 0; }
     </style>
 </head>
 <body>
     <div class="header">
         <h2>{{if .IsInitial}}IP Monitor Initial State{{else}}IP Address Change Alert{{end}}</h2>
+        {{if .IsInitial}}
+        <p>IP Monitor has started. This is the current network configuration.</p>
+        {{end}}
     </div>
     <div class="content">
         <p><strong>Host:</strong> {{.Hostname}}</p>
         <p><strong>Interface:</strong> {{.Interface}}</p>
         <p><strong>Time:</strong> {{.UpdatedAt.Format "2006-01-02 15:04:05"}}</p>
 
-        {{if .IsInitial}}
-        <div class="initial-notice">
-            <h3>Initial State Notification</h3>
-            <p>IP Monitor has started. This is the current network configuration.</p>
-        </div>
-        {{else}}
+        {{if not .IsInitial}}
         <div class="changes">
             <h3>Changes Detected:</h3>
             <ul>
