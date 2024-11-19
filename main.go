@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"ip-monitor/config"
-	"ip-monitor/monitor"
+	"github.com/haiyon/wameter/config"
+	"github.com/haiyon/wameter/monitor"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

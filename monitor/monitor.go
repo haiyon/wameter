@@ -10,15 +10,15 @@ import (
 	"sync"
 	"time"
 
-	"ip-monitor/config"
-	"ip-monitor/metrics"
-	"ip-monitor/notifier"
-	"ip-monitor/types"
+	"github.com/haiyon/wameter/config"
+	"github.com/haiyon/wameter/metrics"
+	"github.com/haiyon/wameter/notifier"
+	"github.com/haiyon/wameter/types"
 
 	"go.uber.org/zap"
 )
 
-// Monitor handles IP monitoring
+// Monitor handles Wameter
 type Monitor struct {
 	config         *config.Config
 	logger         *zap.Logger
@@ -84,10 +84,12 @@ func NewMonitor(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*M
 
 // Start begins the monitoring process
 func (m *Monitor) Start() error {
-	m.logger.Info("Starting IP monitor",
-		zap.Bool("external_ip_enabled", m.config.CheckExternalIP),
+	m.logger.Info("Starting Wameter",
 		zap.Any("interface_types", m.config.InterfaceConfig.InterfaceTypes),
-		zap.Bool("include_virtual", m.config.InterfaceConfig.IncludeVirtual))
+		zap.Bool("include_virtual", m.config.InterfaceConfig.IncludeVirtual),
+		zap.Bool("external_ip_enabled", m.config.CheckExternalIP),
+		zap.Int("check_interval", m.config.CheckInterval),
+		zap.Bool("network_stats", m.config.InterfaceConfig.StatCollection.Enabled))
 
 	// Start network stats collector
 	go func() {
@@ -120,7 +122,7 @@ func (m *Monitor) Start() error {
 
 // Stop gracefully stops the monitor
 func (m *Monitor) Stop(ctx context.Context) error {
-	m.logger.Info("Stopping IP monitor...")
+	m.logger.Info("Stopping Wameter...")
 
 	// Stop network stats collector
 	m.statsCollector.Stop()

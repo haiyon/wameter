@@ -19,7 +19,7 @@ esac
 
 # Paths (OS specific)
 if [ "$IS_MACOS" -eq 1 ]; then
-    BASE_DIR="/opt/ipm"
+    BASE_DIR="/opt/wameter"
     INSTALL_DIR="$BASE_DIR/bin"
     CONFIG_DIR="$BASE_DIR/etc"
     LOG_DIR="$BASE_DIR/log"
@@ -27,13 +27,13 @@ if [ "$IS_MACOS" -eq 1 ]; then
     LAUNCH_DAEMONS_DIR="/Library/LaunchDaemons"
 else
     INSTALL_DIR="/usr/local/bin"
-    CONFIG_DIR="/etc/ipm"
-    LOG_DIR="/var/log/ipm"
+    CONFIG_DIR="/etc/wameter"
+    LOG_DIR="/var/log/wameter"
     SYSTEMD_DIR="/etc/systemd/system"
 fi
 
-BINARY_NAME="ipm"
-SERVICE_NAME="com.haiyon.ipm"
+BINARY_NAME="wameter"
+SERVICE_NAME="com.wameter.monitor"
 
 # Print functions
 print_info() {

@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"ip-monitor/config"
-	"ip-monitor/types"
-	"ip-monitor/utils"
+	"github.com/haiyon/wameter/config"
+	"github.com/haiyon/wameter/types"
+	"github.com/haiyon/wameter/utils"
 )
 
 // EmailNotifier handles email notifications
@@ -90,7 +90,7 @@ const emailTemplate = `
 </head>
 <body>
     <div class="header">
-        <h2>{{if .IsInitial}}IP Monitor Initial State{{else}}IP Address Change Alert{{end}}</h2>
+        <h2>{{if .IsInitial}}Wameter Initial State{{else}}IP Address Change Alert{{end}}</h2>
         <p><strong>Host:</strong> {{.Hostname}}</p>
         <p><strong>Time:</strong> {{.UpdatedAt.Format "2006-01-02 15:04:05"}}</p>
     </div>
@@ -295,7 +295,7 @@ func (n *EmailNotifier) Send(oldState, newState types.IPState, changes []Interfa
 // formatEmailSubject generates an appropriate email subject based on the changes
 func (n *EmailNotifier) formatEmailSubject(hostname string, changes []InterfaceChange, isInitial bool) string {
 	if isInitial {
-		return fmt.Sprintf("IP Monitor Started - Initial State - %s", hostname)
+		return fmt.Sprintf("Wameter Started - Initial State - %s", hostname)
 	}
 
 	// Count interfaces with changes

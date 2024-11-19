@@ -3,8 +3,8 @@ package metrics
 import (
 	"time"
 
-	"ip-monitor/types"
-	"ip-monitor/utils"
+	"github.com/haiyon/wameter/types"
+	"github.com/haiyon/wameter/utils"
 )
 
 // NetworkInterfaceMetrics represents metrics for a single network interface

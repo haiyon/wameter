@@ -6,8 +6,7 @@ logs/*
 build/
 dist/
 
-ipm
-ip-monitor
+wameter
 
 # config
 !config.example.json

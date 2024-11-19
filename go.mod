@@ -1,4 +1,4 @@
-module ip-monitor
+module github.com/haiyon/wameter
 
 go 1.23.3
 

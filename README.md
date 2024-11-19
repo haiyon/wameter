@@ -1,6 +1,6 @@
-# IP Monitor
+# Wameter
 
-IP Monitor is a versatile IP address monitoring tool that tracks both internal and external IP address changes and
+**Wameter** is a versatile IP address monitoring tool that tracks both internal and external IP address changes and
 provides notifications through multiple channels. It supports ESXi, Linux, macOS, and Windows platforms.
 
 ## Features
@@ -99,7 +99,7 @@ Telegram messages include:
 ├── config/                # Configuration management
 │   └── config.go          # Configuration structures and validation
 ├── logs/                  # Log files directory
-│   ├── ip_monitor.log     # Application logs
+│   ├── wameter.log        # Application logs
 │   └── last_ip.json      # Last known IP state
 ├── metrics/               # Metrics collection
 │   ├── metrics.go         # Core metrics implementation
@@ -168,7 +168,7 @@ For building:
 Build for your current platform:
 
 ```bash
-go build -o ipm
+go build -o wameter
 ```
 
 Cross compilation:
@@ -176,19 +176,19 @@ Cross compilation:
 For Linux:
 
 ```bash
-GOOS=linux GOARCH=amd64 go build -o ipm-linux
+GOOS=linux GOARCH=amd64 go build -o wameter-linux
 ```
 
 For macOS:
 
 ```bash
-GOOS=darwin GOARCH=amd64 go build -o ipm-macos
+GOOS=darwin GOARCH=amd64 go build -o wameter-macos
 ```
 
 For Windows:
 
 ```bash
-GOOS=windows GOARCH=amd64 go build -o ipm.exe
+GOOS=windows GOARCH=amd64 go build -o wameter.exe
 ```
 
 ### ESXi VIB Package
@@ -201,58 +201,58 @@ GOOS=windows GOARCH=amd64 go build -o ipm.exe
 
 ### Standard Platforms (Linux/macOS/Windows)
 
-1. Download or build the appropriate binary for your platform
-2. Create configuration directory:
+1. Download or build the appropriate binary for your platform.
+2. Create a configuration directory:
 
    ```bash
    # Linux/macOS
-   sudo mkdir -p /etc/ipm
+   sudo mkdir -p /etc/wameter
 
    # Windows (PowerShell as Administrator)
-   New-Item -Path "C:\ProgramData\ipm" -ItemType Directory
+   New-Item -Path "C:\ProgramData\wameter" -ItemType Directory
    ```
 
-3. Copy configuration:
+3. Copy the configuration file:
 
    ```bash
    # Linux/macOS
-   sudo cp config.example.json /etc/ipm/config.json
+   sudo cp config.example.json /etc/wameter/config.json
 
    # Windows
-   Copy-Item config.example.json C:\ProgramData\ipm\config.json
+   Copy-Item config.example.json C:\ProgramData\wameter\config.json
    ```
 
-4. Create log directory:
+4. Create a log directory:
 
    ```bash
    # Linux/macOS
-   sudo mkdir -p /var/log/ipm
+   sudo mkdir -p /var/log/wameter
 
    # Windows
-   New-Item -Path "C:\ProgramData\ipm\logs" -ItemType Directory
+   New-Item -Path "C:\ProgramData\wameter\logs" -ItemType Directory
    ```
 
 ### ESXi Installation
 
-1. Copy the VIB to your ESXi host:
+1. Copy the VIB package to your ESXi host:
 
    ```bash
-   scp dist/com.haiyon.ipm-1.0.0-1.vib root@esxi-host:/tmp/
+   scp dist/com.haiyon.wameter-1.0.0-1.vib root@esxi-host:/tmp/
    ```
 
 2. Install the VIB:
 
    ```bash
-   esxcli software vib install -v /tmp/com.haiyon.ipm-1.0.0-1.vib
+   esxcli software vib install -v /tmp/com.haiyon.wameter-1.0.0-1.vib
    ```
 
 ## Configuration
 
 Default configuration paths:
 
-- Linux/macOS: `/etc/ipm/config.json`
-- Windows: `C:\ProgramData\ipm\config.json`
-- ESXi: `/etc/ipm/config.json`
+- Linux/macOS: `/etc/wameter/config.json`
+- Windows: `C:\ProgramData\wameter\config.json`
+- ESXi: `/etc/wameter/config.json`
 
 Example configuration: `config.example.json`
 
@@ -276,20 +276,20 @@ Example configuration: `config.example.json`
 Running directly:
 
 ```bash
-./ipm -config /etc/ipm/config.json
+./wameter -config /etc/wameter/config.json
 ```
 
 Using systemd (Linux):
 
 ```bash
-# Create service file
-sudo tee /etc/systemd/system/ipm.service << EOF
+# Create a service file
+sudo tee /etc/systemd/system/wameter.service << EOF
 [Unit]
-Description=IP Monitor Service
+Description=Wameter Service
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/ipm -config /etc/ipm/config.json
+ExecStart=/usr/local/bin/wameter -config /etc/wameter/config.json
 Restart=always
 User=nobody
 
@@ -297,9 +297,9 @@ User=nobody
 WantedBy=multi-user.target
 EOF
 
-# Start service
-sudo systemctl enable ipm
-sudo systemctl start ipm
+# Start the service
+sudo systemctl enable wameter
+sudo systemctl start wameter
 ```
 
 ### Windows
@@ -307,16 +307,16 @@ sudo systemctl start ipm
 Running directly:
 
 ```powershell
-.\ipm.exe -config C:\ProgramData\ipm\config.json
+.\wameter.exe -config C:\ProgramData\wameter\config.json
 ```
 
 Install as a Windows Service:
 
 ```powershell
 # Using NSSM (Non-Sucking Service Manager)
-nssm install IPMonitor "C:\Program Files\ipm\ipm.exe"
-nssm set IPMonitor AppParameters "-config C:\ProgramData\ipm\config.json"
-nssm start IPMonitor
+nssm install Wameter "C:\Program Files\wameter\wameter.exe"
+nssm set Wameter AppParameters "-config C:\ProgramData\wameter\config.json"
+nssm start Wameter
 ```
 
 ### ESXi
@@ -324,18 +324,18 @@ nssm start IPMonitor
 Using service commands:
 
 ```bash
-/etc/init.d/ipm start
-/etc/init.d/ipm stop
-/etc/init.d/ipm status
+/etc/init.d/wameter start
+/etc/init.d/wameter stop
+/etc/init.d/wameter status
 ```
 
 ## Logging
 
 Log file locations:
 
-- Linux/macOS: `/var/log/ipm/monitor.log`
-- Windows: `C:\ProgramData\ipm\logs\monitor.log`
-- ESXi: `/var/log/ipm/monitor.log`
+- Linux/macOS: `/var/log/wameter/monitor.log`
+- Windows: `C:\ProgramData\wameter\logs\monitor.log`
+- ESXi: `/var/log/wameter/monitor.log`
 
 ## License
 

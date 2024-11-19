@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-const appName = "ip-monitor"
+const appName = "wameter"
 
 // Config represents the application configuration
 type Config struct {
@@ -369,7 +369,7 @@ func validateLogConfig(config *LogConfig) error {
 
 	if config.Filename == "" {
 		// Use default filename
-		config.Filename = "ip_monitor.log"
+		config.Filename = "monitor.log"
 	}
 
 	// Create log directory if it doesn't exist
@@ -401,7 +401,7 @@ func getConfigPaths() []string {
 		"config.json",
 		fmt.Sprintf("./%s.json", appName),
 
-		// 2. User configuration directory (~/.config/ip-monitor/config.json)
+		// 2. User configuration directory (~/.config/wameter/config.json)
 		filepath.Join(homeDir, ".config", appName, "config.json"),
 
 		// 3. System configuration directory

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"ip-monitor/config"
-	"ip-monitor/types"
-	"ip-monitor/utils"
+	"github.com/haiyon/wameter/config"
+	"github.com/haiyon/wameter/types"
+	"github.com/haiyon/wameter/utils"
 )
 
 // TelegramNotifier handles Telegram notifications
@@ -222,7 +222,7 @@ func formatTelegramMessage(hostname string, oldState, newState *types.IPState, c
 	var b strings.Builder
 
 	if opts.isInitial {
-		b.WriteString("*IP Monitor Started - Initial State*\n\n")
+		b.WriteString("*Wameter Started - Initial State*\n\n")
 	} else {
 		b.WriteString("*IP Address Change Alert*\n\n")
 	}

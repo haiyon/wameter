@@ -3,14 +3,15 @@ package monitor
 import (
 	"context"
 	"fmt"
-	"ip-monitor/config"
-	"ip-monitor/metrics"
 	"net"
 	"sync"
 	"time"
 
-	"ip-monitor/types"
-	"ip-monitor/utils"
+	"github.com/haiyon/wameter/config"
+	"github.com/haiyon/wameter/metrics"
+
+	"github.com/haiyon/wameter/types"
+	"github.com/haiyon/wameter/utils"
 
 	"go.uber.org/zap"
 )
@@ -42,12 +43,12 @@ func NewNetworkStatsCollector(ctx context.Context, config *config.InterfaceConfi
 // Start begins collecting network statistics
 func (c *NetworkStatsCollector) Start() error {
 	if !c.config.StatCollection.Enabled {
-		c.logger.Info("Network statistics collection is disabled")
+		// c.logger.Info("Network statistics collection is disabled")
 		return nil
 	}
 
-	c.logger.Info("Starting network statistics",
-		zap.Int("interval", c.config.StatCollection.Interval))
+	// c.logger.Info("Starting network statistics",
+	// 	zap.Int("interval", c.config.StatCollection.Interval))
 
 	ticker := time.NewTicker(time.Duration(c.config.StatCollection.Interval) * time.Second)
 	defer ticker.Stop()
@@ -71,7 +72,7 @@ func (c *NetworkStatsCollector) Start() error {
 
 // Stop stops the statistics collection
 func (c *NetworkStatsCollector) Stop() {
-	c.logger.Info("Stopping network statistics collection")
+	c.logger.Info("Stopping network statistics")
 	c.cancel()
 }
 

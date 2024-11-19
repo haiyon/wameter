@@ -3,7 +3,7 @@
 set -e
 
 # Configuration
-NAME="com.haiyon.ipm"
+NAME="com.wameter.monitor"
 VENDOR="Shen"
 DESCRIPTION="IP Address Monitoring Service for ESXi"
 VERSION="1.0.0"
@@ -18,9 +18,9 @@ PAYLOAD_DIR="${BUILD_DIR}/payload"
 TEMP_DIR="/tmp/vib-temp-$$"
 
 # File paths
-BINARY_PATH="/opt/ipm/sbin/ipm"
-CONFIG_PATH="/etc/ipm/config.json"
-INIT_SCRIPT="/etc/init.d/ipm"
+BINARY_PATH="/opt/wameter/sbin/wameter"
+CONFIG_PATH="/etc/wameter/config.json"
+INIT_SCRIPT="/etc/init.d/wameter"
 
 # Logger function
 log() {
@@ -69,9 +69,9 @@ check_dependencies() {
 # Create directory structure
 create_directories() {
 	mkdir -p "${STAGE_DIR}"
-	mkdir -p "${PAYLOAD_DIR}/opt/ipm/sbin"
-	mkdir -p "${PAYLOAD_DIR}/etc/ipm"
-	mkdir -p "${PAYLOAD_DIR}/var/log/ipm"
+	mkdir -p "${PAYLOAD_DIR}/opt/wameter/sbin"
+	mkdir -p "${PAYLOAD_DIR}/etc/wameter"
+	mkdir -p "${PAYLOAD_DIR}/var/log/wameter"
 	mkdir -p "${PAYLOAD_DIR}/etc/init.d"
 	mkdir -p "${TEMP_DIR}"
 }
@@ -95,13 +95,13 @@ create_init_script() {
 	cat >"${PAYLOAD_DIR}${INIT_SCRIPT}" <<'EOF'
 #!/bin/sh
 
-# IP Monitor Service for ESXi
+# Wameter Service for ESXi
 # chkconfig: 2345 90 10
 
-DAEMON=/opt/ipm/sbin/ipm
-CONFIG=/etc/ipm/config.json
-PID_FILE=/var/run/ipm.pid
-LOG_DIR=/var/log/ipm
+DAEMON=/opt/wameter/sbin/wameter
+CONFIG=/etc/wameter/config.json
+PID_FILE=/var/run/wameter.pid
+LOG_DIR=/var/log/wameter
 
 [ -f /etc/rc.status ] && . /etc/rc.status
 
@@ -115,7 +115,7 @@ check_running() {
 
 start() {
 	if check_running; then
-		echo "IP Monitor is already running."
+		echo "Wameter is already running."
 		return 0
 	fi
 
@@ -125,16 +125,16 @@ start() {
 
 	sleep 1
 	if check_running; then
-		echo "IP Monitor started successfully."
+		echo "Wameter started successfully."
 		return 0
 	fi
-	echo "Failed to start IP Monitor."
+	echo "Failed to start Wameter."
 	return 1
 }
 
 stop() {
 	if ! check_running; then
-		echo "IP Monitor is not running."
+		echo "Wameter is not running."
 		return 0
 	fi
 
@@ -143,7 +143,7 @@ stop() {
 	for i in $(seq 1 30); do
 		if ! kill -0 "$pid" 2>/dev/null; then
 			rm -f "$PID_FILE"
-			echo "IP Monitor stopped."
+			echo "Wameter stopped."
 			return 0
 		fi
 		sleep 1
@@ -151,15 +151,15 @@ stop() {
 
 	kill -9 "$pid" 2>/dev/null
 	rm -f "$PID_FILE"
-	echo "Force stopped IP Monitor."
+	echo "Force stopped Wameter."
 }
 
 status() {
 	if check_running; then
-		echo "IP Monitor is running (pid $(cat "$PID_FILE"))"
+		echo "Wameter is running (pid $(cat "$PID_FILE"))"
 		return 0
 	fi
-	echo "IP Monitor is not running"
+	echo "Wameter is not running"
 	return 3
 }
 
@@ -203,11 +203,11 @@ build_vib() {
     <name>${NAME}</name>
     <version>${VERSION}-${BUILD}</version>
     <vendor>${VENDOR}</vendor>
-    <summary>IP Monitor for ESXi</summary>
+    <summary>Wameter for ESXi</summary>
     <description>${DESCRIPTION}</description>
     <release-date>$(date -u '+%Y-%m-%dT%H:%M:%S')</release-date>
     <urls>
-        <url key="website">https://github.com/haiyon/ip-monitor</url>
+        <url key="website">https://github.com/haiyon/wameter</url>
     </urls>
     <relationships>
         <provides>

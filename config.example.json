@@ -67,8 +67,8 @@
     ]
   },
   "log": {
-    "directory": "/var/log/ipm",
-    "filename": "ip_monitor.log",
+    "directory": "/var/log/wameter",
+    "filename": "monitor.log",
     "max_size": 100,
     "max_backups": 3,
     "max_age": 28,
@@ -92,5 +92,5 @@
     "max_idle_conns_per_host": 10
   },
   "debug": false,
-  "last_ip_file": "/var/lib/ip-monitor/last_state.json"
+  "last_ip_file": "/var/lib/wameter/last_state.json"
 }

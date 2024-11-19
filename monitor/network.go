@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"ip-monitor/types"
-	"ip-monitor/utils"
+	"github.com/haiyon/wameter/types"
+	"github.com/haiyon/wameter/utils"
 
 	"go.uber.org/zap"
 )
@@ -331,7 +331,7 @@ func (m *Monitor) fetchExternalIP(ctx context.Context, provider string) (string,
 	}
 
 	// Add headers
-	req.Header.Set("User-Agent", "ip-monitor/1.0")
+	req.Header.Set("User-Agent", "github.com/haiyon/wameter/1.0")
 	req.Header.Set("Accept", "text/plain")
 
 	// Perform request

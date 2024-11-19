@@ -4,9 +4,9 @@ import (
 	"errors"
 	"fmt"
 
-	"ip-monitor/config"
-	"ip-monitor/types"
-	"ip-monitor/utils"
+	"github.com/haiyon/wameter/config"
+	"github.com/haiyon/wameter/types"
+	"github.com/haiyon/wameter/utils"
 
 	"go.uber.org/zap"
 )

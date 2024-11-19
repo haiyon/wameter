@@ -2,13 +2,14 @@ package utils
 
 import (
 	"fmt"
-	"ip-monitor/types"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/haiyon/wameter/types"
 )
 
 // IsValidIP checks if a string is a valid IP address, optionally checking for IPv6
