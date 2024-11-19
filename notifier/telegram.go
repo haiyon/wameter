@@ -62,33 +62,23 @@ func (n *TelegramNotifier) Send(oldState, newState types.IPState, changes []Inte
 	// Prepare message text
 	message := formatTelegramMessage(hostname, &oldState, &newState, changes, opts)
 
-	messageLength := len(message)
-	if messageLength > 4096 {
-		// Split message if it's too long (Telegram has a 4096 character limit)
-		messages := splitTelegramMessage(message)
-		var errs []error
-
-		// Send multiple messages
-		for _, chatID := range n.config.ChatIDs {
+	for _, chatID := range n.config.ChatIDs {
+		// Split message if it's too long
+		if len(message) > 4000 {
+			// Send multiple messages
+			messages := splitTelegramMessage(message)
 			for i, msg := range messages {
-				partMsg := msg
 				if len(messages) > 1 {
-					partMsg = fmt.Sprintf("(Part %d/%d)\n\n%s", i+1, len(messages), msg)
+					msg = fmt.Sprintf("(Part %d/%d)\n\n%s", i+1, len(messages), msg)
 				}
-				if err := n.sendMessage(chatID, partMsg); err != nil {
-					errs = append(errs, fmt.Errorf("failed to send to chat %s: %w", chatID, err))
+				if err := n.sendMessage(chatID, msg); err != nil {
+					return fmt.Errorf("failed to send message part %d to chat %s: %w", i+1, chatID, err)
 				}
 			}
-		}
-
-		if len(errs) > 0 {
-			return fmt.Errorf("multiple errors while sending telegram messages: %v", errs)
-		}
-	} else {
-		// Send single message
-		for _, chatID := range n.config.ChatIDs {
+		} else {
+			// Send single message
 			if err := n.sendMessage(chatID, message); err != nil {
-				return fmt.Errorf("failed to send to chat %s: %w", chatID, err)
+				return fmt.Errorf("failed to send message to chat %s: %w", chatID, err)
 			}
 		}
 	}
@@ -144,17 +134,36 @@ func (n *TelegramNotifier) sendMessage(chatID, text string) error {
 		ParseMode: "Markdown",
 	}
 
-	// Retry the send operation
-	return utils.Retry(3, time.Second, func() error {
-		return n.doSendMessage(url, msg)
+	var lastErr error
+	err := utils.Retry(3, time.Second, func() error {
+		if err := n.doSendMessage(url, msg); err != nil {
+			lastErr = err
+			// On network errors, retry
+			if strings.Contains(err.Error(), "failed to send request") ||
+				strings.Contains(err.Error(), "timeout") ||
+				strings.Contains(err.Error(), "connection refused") {
+				return err
+			}
+			// On other errors, stop
+			return utils.StopRetry(err)
+		}
+		return nil
 	})
+
+	if err != nil {
+		if lastErr != nil {
+			return fmt.Errorf("telegram send failed after retries: %w", lastErr)
+		}
+		return err
+	}
+	return nil
 }
 
 // doSendMessage performs the actual message sending
 func (n *TelegramNotifier) doSendMessage(url string, msg TelegramMessage) error {
 	data, err := json.Marshal(msg)
 	if err != nil {
-		return fmt.Errorf("failed to marshal message: %w", err)
+		return utils.StopRetry(fmt.Errorf("failed to marshal message: %w", err))
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -163,7 +172,7 @@ func (n *TelegramNotifier) doSendMessage(url string, msg TelegramMessage) error 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url,
 		bytes.NewReader(data))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return utils.StopRetry(fmt.Errorf("failed to create request: %w", err))
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -174,29 +183,35 @@ func (n *TelegramNotifier) doSendMessage(url string, msg TelegramMessage) error 
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("telegram API returned non-200 status code: %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2048))
 	if err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return utils.StopRetry(fmt.Errorf("telegram API returned status %d, response: %s",
+			resp.StatusCode, string(body)))
+	}
+
 	if len(body) == 0 {
-		return fmt.Errorf("empty response from telegram API")
+		return utils.StopRetry(fmt.Errorf("empty response from telegram API"))
 	}
 
 	var telegramResp TelegramResponse
 	if err := json.Unmarshal(body, &telegramResp); err != nil {
-		return fmt.Errorf("failed to parse response (body: %s): %w", string(body), err)
+		bodyStr := string(body)
+		if len(bodyStr) > 100 {
+			bodyStr = bodyStr[:100] + "..."
+		}
+		return utils.StopRetry(fmt.Errorf("failed to parse response: %w, body: %q", err, bodyStr))
 	}
 
 	if !telegramResp.OK {
+		errMsg := "unknown error"
 		if telegramResp.Description != "" {
-			return fmt.Errorf("telegram API error: %s", telegramResp.Description)
+			errMsg = telegramResp.Description
 		}
-		return fmt.Errorf("telegram API returned error without description")
+		return utils.StopRetry(fmt.Errorf("telegram API error: %s", errMsg))
 	}
 
 	return nil

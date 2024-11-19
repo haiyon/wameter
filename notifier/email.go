@@ -264,12 +264,29 @@ func (n *EmailNotifier) Send(oldState, newState types.IPState, changes []Interfa
 		body.String())
 
 	// Send email with retry
+	var lastErr error
 	err = utils.Retry(3, time.Second, func() error {
-		return n.sendMail(from.Address, toAddresses, []byte(msg))
+		if err := n.sendMail(from.Address, toAddresses, []byte(msg)); err != nil {
+			lastErr = err
+			// On network errors, retry
+			if strings.Contains(err.Error(), "failed to connect") ||
+				strings.Contains(err.Error(), "connection refused") ||
+				strings.Contains(err.Error(), "i/o timeout") ||
+				strings.Contains(err.Error(), "broken pipe") ||
+				strings.Contains(err.Error(), "connection reset") {
+				return err
+			}
+			// On other errors, stop
+			return utils.StopRetry(err)
+		}
+		return nil
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to send email: %w", err)
+		if lastErr != nil {
+			return fmt.Errorf("email send failed after retries: %w", lastErr)
+		}
+		return err
 	}
 
 	return nil
@@ -324,28 +341,30 @@ func (n *EmailNotifier) sendMail(from string, to []string, msg []byte) error {
 			ServerName: n.config.SMTPServer,
 		}
 		conn, err = tls.Dial("tcp", addr, tlsConfig)
+		if err != nil {
+			return fmt.Errorf("failed to connect to SMTP server: %w", err)
+		}
 	} else {
 		conn, err = net.Dial("tcp", addr)
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to connect to SMTP server: %w", err)
+		if err != nil {
+			return fmt.Errorf("failed to connect to SMTP server: %w", err)
+		}
 	}
 	defer conn.Close()
 
 	// Create SMTP client
 	client, err = smtp.NewClient(conn, n.config.SMTPServer)
 	if err != nil {
-		return fmt.Errorf("failed to create SMTP client: %w", err)
+		return utils.StopRetry(fmt.Errorf("failed to create SMTP client: %w", err))
 	}
-	defer client.Quit() // Changed: just call Quit() without checking the error
+	defer client.Close()
 
 	// Start TLS if not already using TLS and server requires it
 	if !n.config.UseTLS {
 		if ok, _ := client.Extension("STARTTLS"); ok {
 			cfg := &tls.Config{ServerName: n.config.SMTPServer}
 			if err = client.StartTLS(cfg); err != nil {
-				return fmt.Errorf("failed to start TLS: %w", err)
+				return utils.StopRetry(fmt.Errorf("failed to start TLS: %w", err))
 			}
 		}
 	}
@@ -354,26 +373,26 @@ func (n *EmailNotifier) sendMail(from string, to []string, msg []byte) error {
 	if n.config.Username != "" && n.config.Password != "" {
 		auth := smtp.PlainAuth("", n.config.Username, n.config.Password, n.config.SMTPServer)
 		if err := client.Auth(auth); err != nil {
-			return fmt.Errorf("SMTP authentication failed: %w", err)
+			return utils.StopRetry(fmt.Errorf("SMTP authentication failed: %w", err))
 		}
 	}
 
 	// Set sender
 	if err := client.Mail(from); err != nil {
-		return fmt.Errorf("failed to set sender: %w", err)
+		return utils.StopRetry(fmt.Errorf("failed to set sender: %w", err))
 	}
 
 	// Set recipients
 	for _, recipient := range to {
 		if err := client.Rcpt(recipient); err != nil {
-			return fmt.Errorf("failed to add recipient %s: %w", recipient, err)
+			return utils.StopRetry(fmt.Errorf("failed to add recipient %s: %w", recipient, err))
 		}
 	}
 
 	// Send message
 	writer, err := client.Data()
 	if err != nil {
-		return fmt.Errorf("failed to create message writer: %w", err)
+		return utils.StopRetry(fmt.Errorf("failed to create message writer: %w", err))
 	}
 
 	_, err = writer.Write(msg)
@@ -387,5 +406,5 @@ func (n *EmailNotifier) sendMail(from string, to []string, msg []byte) error {
 		return fmt.Errorf("failed to close message writer: %w", err)
 	}
 
-	return nil // Success - don't check Quit() error as it's just cleanup
+	return nil
 }

@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"fmt"
+	"errors"
 	"runtime"
 	"sort"
 	"time"
@@ -12,26 +12,46 @@ func IsLinux() bool {
 	return runtime.GOOS == "linux"
 }
 
-// Retry retries an operation with exponential backoff
-func Retry(maxAttempts int, initialDelay time.Duration, op func() error) error {
-	var err error
-	delay := initialDelay
+// StopRetryError is a special error type that indicates retry should stop
+type StopRetryError struct {
+	err error
+}
 
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		err = op()
-		if err == nil {
+func (e *StopRetryError) Error() string {
+	return e.err.Error()
+}
+
+// StopRetry wraps an error to indicate that retry should stop
+func StopRetry(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &StopRetryError{err: err}
+}
+
+// IsStopRetry checks if an error is a StopRetryError
+func IsStopRetry(err error) bool {
+	var stopRetryError *StopRetryError
+	ok := errors.As(err, &stopRetryError)
+	return ok
+}
+
+// Retry retries an operation with exponential backoff
+func Retry(attempts int, delay time.Duration, fn func() error) error {
+	var err error
+	for i := 0; i < attempts; i++ {
+		if err = fn(); err == nil {
 			return nil
 		}
-
-		if attempt == maxAttempts {
-			break
+		if IsStopRetry(err) {
+			return err.(*StopRetryError).err
 		}
-
-		time.Sleep(delay)
-		delay *= 2 // exponential backoff
+		if i < attempts-1 {
+			time.Sleep(delay)
+			delay = delay * 2
+		}
 	}
-
-	return fmt.Errorf("operation failed after %d attempts: %w", maxAttempts, err)
+	return err
 }
 
 // StringSlicesEqual compares two string slices
