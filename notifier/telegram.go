@@ -62,27 +62,35 @@ func (n *TelegramNotifier) Send(oldState, newState types.IPState, changes []Inte
 	// Prepare message text
 	message := formatTelegramMessage(hostname, &oldState, &newState, changes, opts)
 
-	// Split message if it's too long (Telegram has a 4096 character limit)
-	messages := splitTelegramMessage(message)
+	messageLength := len(message)
+	if messageLength > 4096 {
+		// Split message if it's too long (Telegram has a 4096 character limit)
+		messages := splitTelegramMessage(message)
+		var errs []error
 
-	// Send to all configured chat IDs
-	var lastErr error
-	for _, chatID := range n.config.ChatIDs {
-		// Send each part of the split message
-		for i, msg := range messages {
-			if len(messages) > 1 {
-				// Add part number for split messages
-				msg = fmt.Sprintf("(Part %d/%d)\n\n%s", i+1, len(messages), msg)
-			}
-			if err := n.sendMessage(chatID, msg); err != nil {
-				lastErr = err
-				continue
+		// Send multiple messages
+		for _, chatID := range n.config.ChatIDs {
+			for i, msg := range messages {
+				partMsg := msg
+				if len(messages) > 1 {
+					partMsg = fmt.Sprintf("(Part %d/%d)\n\n%s", i+1, len(messages), msg)
+				}
+				if err := n.sendMessage(chatID, partMsg); err != nil {
+					errs = append(errs, fmt.Errorf("failed to send to chat %s: %w", chatID, err))
+				}
 			}
 		}
-	}
 
-	if lastErr != nil {
-		return fmt.Errorf("failed to send telegram messages: %w", lastErr)
+		if len(errs) > 0 {
+			return fmt.Errorf("multiple errors while sending telegram messages: %v", errs)
+		}
+	} else {
+		// Send single message
+		for _, chatID := range n.config.ChatIDs {
+			if err := n.sendMessage(chatID, message); err != nil {
+				return fmt.Errorf("failed to send to chat %s: %w", chatID, err)
+			}
+		}
 	}
 
 	return nil
@@ -166,18 +174,29 @@ func (n *TelegramNotifier) doSendMessage(url string, msg TelegramMessage) error 
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("telegram API returned non-200 status code: %d", resp.StatusCode)
+	}
+
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
 	if err != nil {
 		return fmt.Errorf("failed to read response: %w", err)
 	}
 
+	if len(body) == 0 {
+		return fmt.Errorf("empty response from telegram API")
+	}
+
 	var telegramResp TelegramResponse
 	if err := json.Unmarshal(body, &telegramResp); err != nil {
-		return fmt.Errorf("failed to parse response: %w", err)
+		return fmt.Errorf("failed to parse response (body: %s): %w", string(body), err)
 	}
 
 	if !telegramResp.OK {
-		return fmt.Errorf("telegram API error: %s", telegramResp.Description)
+		if telegramResp.Description != "" {
+			return fmt.Errorf("telegram API error: %s", telegramResp.Description)
+		}
+		return fmt.Errorf("telegram API returned error without description")
 	}
 
 	return nil
@@ -199,7 +218,6 @@ func formatTelegramMessage(hostname string, oldState, newState *types.IPState, c
 	// Group changes by interface
 	for _, ifaceChange := range changes {
 		b.WriteString(fmt.Sprintf("*Interface: %s (%s)*\n", ifaceChange.Name, ifaceChange.Type))
-		b.WriteString(fmt.Sprintf("Status: `%s`\n", ifaceChange.Status))
 
 		if len(ifaceChange.Changes) > 0 {
 			b.WriteString("\nChanges:\n")
