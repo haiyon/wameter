@@ -54,7 +54,7 @@ const emailTemplate = `
         body { font-family: Arial, sans-serif; line-height: 1.6; }
         .header { background: #f8f9fa; padding: 20px; border-radius: 5px; }
         .content { padding: 20px; }
-        .changes { background: #fff3cd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .changes { background: #ffffff; padding: 15px; margin: 10px 0; border-radius: 5px; }
         .footer { color: #6c757d; font-size: 12px; padding: 20px; border-top: 1px solid #dee2e6; }
         .ip-group { margin: 10px 0; }
         .ip-group h4 { margin: 5px 0; color: #495057; }
@@ -73,13 +73,6 @@ const emailTemplate = `
             padding-bottom: 10px;
             margin-bottom: 10px;
         }
-        .status {
-            padding: 3px 8px;
-            border-radius: 3px;
-            font-size: 12px;
-        }
-        .status-up { background: #d4edda; color: #155724; }
-        .status-down { background: #f8d7da; color: #721c24; }
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -107,9 +100,6 @@ const emailTemplate = `
         <div class="interface-section">
             <div class="interface-header">
                 <h3>Interface: {{.Name}} ({{.Type}})</h3>
-                <span class="status {{if eq .Status "up"}}status-up{{else}}status-down{{end}}">
-                    {{.Status}}
-                </span>
             </div>
 
             {{if .Changes}}
