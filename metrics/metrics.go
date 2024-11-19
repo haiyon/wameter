@@ -9,14 +9,14 @@ import (
 // Metrics represents monitoring metrics
 type Metrics struct {
 	mu            sync.RWMutex
-	StartTime     time.Time        `json:"start_time"`
-	LastCheckTime time.Time        `json:"last_check_time"`
-	CheckCount    int64            `json:"check_count"`
-	ErrorCount    int64            `json:"error_count"`
-	LastError     string           `json:"last_error"`
-	IPChanges     *IPChangeMetrics `json:"ip_changes"`
-	ProviderStats *ProviderMetrics `json:"provider_stats"`
-	NetworkStats  *NetworkMetrics  `json:"network_stats"`
+	StartTime     time.Time                           `json:"start_time"`
+	LastCheckTime time.Time                           `json:"last_check_time"`
+	CheckCount    int64                               `json:"check_count"`
+	ErrorCount    int64                               `json:"error_count"`
+	LastError     string                              `json:"last_error"`
+	IPChanges     *IPChangeMetrics                    `json:"ip_changes"`
+	ProviderStats *ProviderMetrics                    `json:"provider_stats"`
+	NetworkStats  map[string]*NetworkInterfaceMetrics `json:"network_stats"`
 }
 
 // IPChangeMetrics tracks IP address changes
@@ -55,26 +55,8 @@ func NewMetrics() *Metrics {
 			IPv4Providers: make(map[string]*ProviderStats),
 			IPv6Providers: make(map[string]*ProviderStats),
 		},
-		NetworkStats: &NetworkMetrics{},
+		NetworkStats: make(map[string]*NetworkInterfaceMetrics),
 	}
-}
-
-// RecordCheck records a check attempt
-func (m *Metrics) RecordCheck() {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.CheckCount++
-	m.LastCheckTime = time.Now()
-}
-
-// RecordError records an error
-func (m *Metrics) RecordError(err error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	m.ErrorCount++
-	m.LastError = err.Error()
 }
 
 // RecordProviderRequest records metrics for an external IP provider request
@@ -134,4 +116,22 @@ func (m *Metrics) GetSnapshot() (*Metrics, error) {
 	}
 
 	return &snapshot, nil
+}
+
+// RecordCheck records a check attempt
+func (m *Metrics) RecordCheck() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.CheckCount++
+	m.LastCheckTime = time.Now()
+}
+
+// RecordError records an error
+func (m *Metrics) RecordError(err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ErrorCount++
+	m.LastError = err.Error()
 }

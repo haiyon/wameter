@@ -1,10 +1,37 @@
 {
   "check_interval": 300,
-  "network_interface": "eth0",
   "ip_version": {
     "enable_ipv4": true,
     "enable_ipv6": true,
     "prefer_ipv6": false
+  },
+  "interface_config": {
+    "include_virtual": false,
+    "exclude_interfaces": [
+      "lo",
+      "docker0",
+      "veth*",
+      "br-*",
+      "vmnet*"
+    ],
+    "interface_types": [
+      "ethernet",
+      "wireless"
+    ],
+    "stat_collection": {
+      "enabled": true,
+      "interval": 60,
+      "include_stats": [
+        "rx_bytes",
+        "tx_bytes",
+        "rx_packets",
+        "tx_packets",
+        "rx_errors",
+        "tx_errors",
+        "rx_dropped",
+        "tx_dropped"
+      ]
+    }
   },
   "check_external_ip": true,
   "external_ip_providers": {
@@ -46,7 +73,10 @@
     "max_backups": 3,
     "max_age": 28,
     "compress": true,
-    "level": "info"
+    "level": "info",
+    "rotate_on_startup": true,
+    "use_local_time": true,
+    "time_format": "2006-01-02 15:04:05"
   },
   "retry": {
     "max_attempts": 3,
@@ -61,5 +91,6 @@
     "max_idle_conns": 100,
     "max_idle_conns_per_host": 10
   },
-  "debug": false
+  "debug": false,
+  "last_ip_file": "/var/lib/ip-monitor/last_state.json"
 }

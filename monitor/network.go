@@ -85,50 +85,80 @@ func (m *Monitor) initialCheck() error {
 
 	// Save state after successful notification
 	if err := m.saveState(); err != nil {
-		m.logger.Error("Failed to save initial state",
-			zap.Error(err),
-			zap.String("interface", m.config.NetworkInterface))
+		m.logger.Error("Failed to save initial state", zap.Error(err))
 	}
 
 	return nil
 }
 
-// getCurrentIPs retrieves all current IP addresses for the interface
+// getCurrentIPs retrieves all current IP addresses for all monitored interfaces
 func (m *Monitor) getCurrentIPs() (*types.IPState, error) {
-	iface, err := net.InterfaceByName(m.config.NetworkInterface)
+	interfaces, err := net.Interfaces()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get interface %s: %w",
-			m.config.NetworkInterface, err)
-	}
-
-	addrs, err := iface.Addrs()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get addresses for interface %s: %w",
-			m.config.NetworkInterface, err)
+		return nil, fmt.Errorf("failed to get network interfaces: %w", err)
 	}
 
 	state := &types.IPState{
-		UpdatedAt: time.Now(),
-		IPv4:      make([]string, 0),
-		IPv6:      make([]string, 0),
+		UpdatedAt:     time.Now(),
+		IPv4:          make([]string, 0),
+		IPv6:          make([]string, 0),
+		InterfaceInfo: make(map[string]*types.InterfaceState),
 	}
 
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ip4 := ipnet.IP.To4(); ip4 != nil && m.config.IPVersion.EnableIPv4 {
-				state.IPv4 = append(state.IPv4, ip4.String())
-			} else if ip6 := ipnet.IP.To16(); ip6 != nil && m.config.IPVersion.EnableIPv6 && utils.IsGlobalIPv6(ip6) {
-				// Only add global IPv6 addresses
-				state.IPv6 = append(state.IPv6, ip6.String())
+	for _, iface := range interfaces {
+		// Skip interfaces based on configuration
+		if !shouldMonitorInterface(iface.Name, iface.Flags, m.config.InterfaceConfig) {
+			m.logger.Debug("Skipping interface",
+				zap.String("interface", iface.Name),
+				zap.String("type", string(utils.GetInterfaceType(iface.Name))),
+				zap.String("flags", iface.Flags.String()))
+			continue
+		}
+
+		ifaceState := &types.InterfaceState{
+			Name:      iface.Name,
+			MAC:       iface.HardwareAddr.String(),
+			MTU:       iface.MTU,
+			Flags:     iface.Flags.String(),
+			IPv4:      make([]string, 0),
+			IPv6:      make([]string, 0),
+			UpdatedAt: time.Now(),
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			m.logger.Warn("Failed to get addresses for interface",
+				zap.String("interface", iface.Name),
+				zap.Error(err))
+			continue
+		}
+
+		for _, addr := range addrs {
+			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ip4 := ipnet.IP.To4(); ip4 != nil && m.config.IPVersion.EnableIPv4 {
+					ipWithMask := fmt.Sprintf("%s/%d", ip4.String(), utils.NetworkMaskSize(ipnet.Mask))
+					ifaceState.IPv4 = append(ifaceState.IPv4, ipWithMask)
+					state.IPv4 = append(state.IPv4, ipWithMask)
+				} else if ip6 := ipnet.IP.To16(); ip6 != nil && m.config.IPVersion.EnableIPv6 && utils.IsGlobalIPv6(ip6) {
+					ipWithMask := fmt.Sprintf("%s/%d", ip6.String(), utils.NetworkMaskSize(ipnet.Mask))
+					ifaceState.IPv6 = append(ifaceState.IPv6, ipWithMask)
+					state.IPv6 = append(state.IPv6, ipWithMask)
+				}
 			}
 		}
-	}
 
-	// Log the found IPs
-	m.logger.Debug("Found IP addresses",
-		zap.Strings("ipv4", state.IPv4),
-		zap.Strings("ipv6", state.IPv6),
-		zap.String("interface", m.config.NetworkInterface))
+		// Add interface statistics if available
+		stats, err := utils.GetInterfaceStats(iface.Name)
+		if err != nil {
+			m.logger.Debug("Failed to get interface statistics",
+				zap.String("interface", iface.Name),
+				zap.Error(err))
+		} else {
+			ifaceState.Statistics = stats
+		}
+
+		state.InterfaceInfo[iface.Name] = ifaceState
+	}
 
 	return state, nil
 }
@@ -238,6 +268,56 @@ func (m *Monitor) getExternalIP(ctx context.Context) (string, error) {
 			}
 		}
 	}
+}
+
+// getInterfaceStats retrieves statistics for a network interface
+func getInterfaceStats(ifaceName string) (*types.InterfaceStats, error) {
+	// This is a platform-specific implementation
+	// For Linux, you would read from /sys/class/net/<interface>/statistics/
+	// For other platforms, you might need different approaches
+
+	stats := &types.InterfaceStats{
+		CollectedAt: time.Now(),
+	}
+
+	// Example: Read Linux network interface statistics
+	if utils.IsLinux() {
+		var err error
+		stats.RxBytes, err = utils.ReadNetworkStat(ifaceName, "rx_bytes")
+		if err != nil {
+			return nil, err
+		}
+		stats.TxBytes, err = utils.ReadNetworkStat(ifaceName, "tx_bytes")
+		if err != nil {
+			return nil, err
+		}
+		stats.RxPackets, err = utils.ReadNetworkStat(ifaceName, "rx_packets")
+		if err != nil {
+			return nil, err
+		}
+		stats.TxPackets, err = utils.ReadNetworkStat(ifaceName, "tx_packets")
+		if err != nil {
+			return nil, err
+		}
+		stats.RxErrors, err = utils.ReadNetworkStat(ifaceName, "rx_errors")
+		if err != nil {
+			return nil, err
+		}
+		stats.TxErrors, err = utils.ReadNetworkStat(ifaceName, "tx_errors")
+		if err != nil {
+			return nil, err
+		}
+		stats.RxDropped, err = utils.ReadNetworkStat(ifaceName, "rx_dropped")
+		if err != nil {
+			return nil, err
+		}
+		stats.TxDropped, err = utils.ReadNetworkStat(ifaceName, "tx_dropped")
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return stats, nil
 }
 
 // fetchExternalIP fetches external IP from a specific provider

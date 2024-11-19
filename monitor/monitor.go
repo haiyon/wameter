@@ -20,15 +20,16 @@ import (
 
 // Monitor handles IP monitoring
 type Monitor struct {
-	config    *config.Config
-	logger    *zap.Logger
-	metrics   *metrics.Metrics
-	notifier  *notifier.Notifier
-	lastState types.IPState
-	mu        sync.RWMutex
-	client    *http.Client
-	ctx       context.Context
-	cancel    context.CancelFunc
+	config         *config.Config
+	logger         *zap.Logger
+	metrics        *metrics.Metrics
+	notifier       *notifier.Notifier
+	lastState      types.IPState
+	mu             sync.RWMutex
+	client         *http.Client
+	ctx            context.Context
+	cancel         context.CancelFunc
+	statsCollector *NetworkStatsCollector
 }
 
 // NewMonitor creates a new Monitor instance
@@ -70,6 +71,9 @@ func NewMonitor(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*M
 		cancel:   cancel,
 	}
 
+	// Initialize network stats collector
+	m.statsCollector = NewNetworkStatsCollector(ctx, cfg.InterfaceConfig, logger, m.metrics)
+
 	// Load last known state
 	if err := m.loadState(); err != nil {
 		logger.Warn("Failed to load last state", zap.Error(err))
@@ -81,8 +85,16 @@ func NewMonitor(ctx context.Context, cfg *config.Config, logger *zap.Logger) (*M
 // Start begins the monitoring process
 func (m *Monitor) Start() error {
 	m.logger.Info("Starting IP monitor",
-		zap.String("interface", m.config.NetworkInterface),
-		zap.Bool("external_ip_enabled", m.config.CheckExternalIP))
+		zap.Bool("external_ip_enabled", m.config.CheckExternalIP),
+		zap.Any("interface_types", m.config.InterfaceConfig.InterfaceTypes),
+		zap.Bool("include_virtual", m.config.InterfaceConfig.IncludeVirtual))
+
+	// Start network stats collector
+	go func() {
+		if err := m.statsCollector.Start(); err != nil {
+			m.logger.Error("Failed to start network stats collector", zap.Error(err))
+		}
+	}()
 
 	// Perform initial check and send notification
 	if err := m.initialCheck(); err != nil {
@@ -109,6 +121,10 @@ func (m *Monitor) Start() error {
 // Stop gracefully stops the monitor
 func (m *Monitor) Stop(ctx context.Context) error {
 	m.logger.Info("Stopping IP monitor...")
+
+	// Stop network stats collector
+	m.statsCollector.Stop()
+
 	m.cancel()
 
 	done := make(chan error, 1)
@@ -136,9 +152,7 @@ func (m *Monitor) checkIP(ctx context.Context) error {
 	defer func() {
 		m.metrics.RecordCheck()
 		duration := time.Since(start)
-		m.logger.Debug("IP check completed",
-			zap.Duration("duration", duration),
-			zap.String("interface", m.config.NetworkInterface))
+		m.logger.Debug("IP check completed", zap.Duration("duration", duration))
 	}()
 
 	// Create current state
@@ -173,22 +187,16 @@ func (m *Monitor) checkIP(ctx context.Context) error {
 	if m.config.CheckExternalIP {
 		externalIP, err := m.getExternalIP(ctx)
 		if err != nil {
-			m.logger.Warn("Failed to get external IP",
-				zap.Error(err),
-				zap.String("interface", m.config.NetworkInterface))
+			m.logger.Warn("Failed to get external IP", zap.Error(err))
 		} else {
 			currentState.ExternalIP = externalIP
-			m.logger.Debug("Got external IP",
-				zap.String("ip", externalIP),
-				zap.String("interface", m.config.NetworkInterface))
+			m.logger.Debug("Got external IP", zap.String("ip", externalIP))
 		}
 	}
 
 	// Check for changes and handle them
 	if changed, changes := m.hasIPChanged(currentState); changed {
-		m.logger.Info("IP changes detected",
-			zap.Strings("changes", changes),
-			zap.String("interface", m.config.NetworkInterface))
+		m.logger.Info("IP changes detected", zap.Strings("changes", changes))
 
 		if err := m.handleIPChange(*currentState, changes); err != nil {
 			m.metrics.RecordError(err)
@@ -200,9 +208,7 @@ func (m *Monitor) checkIP(ctx context.Context) error {
 
 		// Save state after successful change handling
 		if err := m.saveState(); err != nil {
-			m.logger.Error("Failed to save state",
-				zap.Error(err),
-				zap.String("interface", m.config.NetworkInterface))
+			m.logger.Error("Failed to save state", zap.Error(err))
 		}
 	}
 
@@ -213,8 +219,9 @@ func (m *Monitor) checkIP(ctx context.Context) error {
 func (m *Monitor) handleIPChange(newState types.IPState, changes []string) error {
 	// Log changes
 	m.logger.Info("IP address changed",
-		zap.Strings("changes", changes),
-		zap.Time("time", newState.UpdatedAt))
+		zap.Time("time", newState.UpdatedAt),
+		zap.Int("interface_count", len(newState.InterfaceInfo)),
+		zap.Strings("changes", changes))
 
 	// Send notifications
 	if err := m.notifier.NotifyIPChange(m.lastState, newState, changes); err != nil {

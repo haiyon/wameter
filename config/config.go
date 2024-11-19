@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/mail"
 	"net/url"
 	"os"
@@ -15,7 +14,6 @@ const appName = "ip-monitor"
 // Config represents the application configuration
 type Config struct {
 	CheckInterval       int               `json:"check_interval"`        // Interval between checks in seconds
-	NetworkInterface    string            `json:"network_interface"`     // Network interface to monitor
 	IPVersion           IPVersionConfig   `json:"ip_version"`            // IP version configuration
 	EmailConfig         *Email            `json:"email"`                 // Email notification settings
 	TelegramConfig      *Telegram         `json:"telegram,omitempty"`    // Telegram notification settings
@@ -24,6 +22,7 @@ type Config struct {
 	Debug               bool              `json:"debug"`                 // Enable debug logging
 	CheckExternalIP     bool              `json:"check_external_ip"`     // Enable external IP checking
 	ExternalIPProviders ExternalProviders `json:"external_ip_providers"` // List of external IP providers
+	InterfaceConfig     *InterfaceConfig  `json:"interface_config"`      // Interface configuration
 }
 
 // IPVersionConfig represents IP version configuration
@@ -37,6 +36,21 @@ type IPVersionConfig struct {
 type ExternalProviders struct {
 	IPv4 []string `json:"ipv4"` // List of IPv4 providers
 	IPv6 []string `json:"ipv6"` // List of IPv6 providers
+}
+
+// InterfaceConfig represents interface monitoring configuration
+type InterfaceConfig struct {
+	IncludeVirtual    bool                  `json:"include_virtual"`
+	ExcludeInterfaces []string              `json:"exclude_interfaces"`
+	InterfaceTypes    []string              `json:"interface_types"`
+	StatCollection    *StatCollectionConfig `json:"stat_collection"`
+}
+
+// StatCollectionConfig represents interface statistics collection configuration
+type StatCollectionConfig struct {
+	Enabled      bool     `json:"enabled"`
+	Interval     int      `json:"interval"`
+	IncludeStats []string `json:"include_stats"`
 }
 
 // Email configuration
@@ -125,20 +139,33 @@ func (c *Config) setDefaults() error {
 		}
 	}
 
-	if c.LogConfig.MaxSize == 0 {
-		c.LogConfig.MaxSize = 100 // 100MB
-	}
-
-	if c.LogConfig.MaxBackups == 0 {
-		c.LogConfig.MaxBackups = 3
-	}
-
-	if c.LogConfig.MaxAge == 0 {
-		c.LogConfig.MaxAge = 28 // 28 days
-	}
-
-	if c.LogConfig.LogLevel == "" {
-		c.LogConfig.LogLevel = "info"
+	// Set default interface configuration
+	if c.InterfaceConfig == nil {
+		c.InterfaceConfig = &InterfaceConfig{
+			IncludeVirtual: false,
+			ExcludeInterfaces: []string{
+				"lo",
+				"docker0",
+			},
+			InterfaceTypes: []string{
+				"ethernet",
+				"wireless",
+			},
+			StatCollection: &StatCollectionConfig{
+				Enabled:  true,
+				Interval: 60,
+				IncludeStats: []string{
+					"rx_bytes",
+					"tx_bytes",
+					"rx_packets",
+					"tx_packets",
+					"rx_errors",
+					"tx_errors",
+					"rx_dropped",
+					"tx_dropped",
+				},
+			},
+		}
 	}
 
 	return nil
@@ -150,13 +177,26 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("check_interval must be at least 60 seconds")
 	}
 
-	// Validate network interface
-	if err := validateInterface(c.NetworkInterface); err != nil {
-		return fmt.Errorf("invalid network_interface: %w", err)
-	}
 	// Enable at least one IP version
 	if !c.IPVersion.EnableIPv4 && !c.IPVersion.EnableIPv6 {
 		return fmt.Errorf("at least one IP version must be enabled")
+	}
+
+	// Validate interface configuration
+	if c.InterfaceConfig == nil {
+		return fmt.Errorf("interface configuration cannot be empty")
+	}
+
+	// Validate interface types
+	if len(c.InterfaceConfig.InterfaceTypes) == 0 {
+		return fmt.Errorf("at least one interface type must be configured")
+	}
+
+	// Validate that configured interface types are valid
+	for _, ifaceType := range c.InterfaceConfig.InterfaceTypes {
+		if !isValidInterfaceType(ifaceType) {
+			return fmt.Errorf("invalid interface type: %s", ifaceType)
+		}
 	}
 
 	// Validate external IP providers
@@ -207,30 +247,20 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// validateInterface validates network interface configuration
-func validateInterface(ifaceName string) error {
-	if ifaceName == "" {
-		return fmt.Errorf("network interface name cannot be empty")
+// isValidInterfaceType checks if the interface type is valid
+func isValidInterfaceType(ifaceType string) bool {
+	validTypes := map[string]bool{
+		"ethernet": true,
+		"wireless": true,
+		"bridge":   true,
+		"virtual":  true,
+		"tunnel":   true,
+		"bonding":  true,
+		"vlan":     true,
 	}
-
-	iface, err := net.InterfaceByName(ifaceName)
-	if err != nil {
-		availableIfaces, _ := net.Interfaces() // Get all available interfaces
-		ifaceNames := make([]string, len(availableIfaces))
-		for i, iface := range availableIfaces {
-			ifaceNames[i] = iface.Name
-		}
-		return fmt.Errorf("interface %s not found. Available interfaces: %v", ifaceName, ifaceNames)
-	}
-
-	if iface.Flags&net.FlagUp == 0 {
-		return fmt.Errorf("interface %s is down", ifaceName)
-	}
-
-	return nil
+	return validTypes[ifaceType]
 }
 
-// validateProviders validates external IP providers
 func validateProviders(providers []string) error {
 	if len(providers) == 0 {
 		return fmt.Errorf("no providers configured")

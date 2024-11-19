@@ -2,29 +2,14 @@ package utils
 
 import (
 	"fmt"
-	"net"
+	"runtime"
 	"sort"
 	"time"
 )
 
-// IsValidIP checks if a string is a valid IP address, optionally checking for IPv6
-func IsValidIP(ip string, wantV6 ...bool) bool {
-	parsedIP := net.ParseIP(ip)
-	if parsedIP == nil {
-		return false
-	}
-	if len(wantV6) > 0 && wantV6[0] {
-		return parsedIP.To16() != nil && parsedIP.To4() == nil
-	}
-	return parsedIP.To4() != nil
-}
-
-// IsGlobalIPv6 checks if the IPv6 address is global (not link-local)
-func IsGlobalIPv6(ip net.IP) bool {
-	if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
-		return false
-	}
-	return true
+// IsLinux checks if the current system is Linux
+func IsLinux() bool {
+	return runtime.GOOS == "linux"
 }
 
 // Retry retries an operation with exponential backoff
