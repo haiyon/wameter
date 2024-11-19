@@ -105,7 +105,7 @@ check_and_build() {
         export CGO_ENABLED=0
 
         # Get current git commit hash and build date
-        VERSION=${VERSION:-"1.0.0"}
+        VERSION=${VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo "1.0.0")}
         GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
         BUILD_DATE=$(date -u '+%Y-%m-%d_%H:%M:%S')
 
@@ -115,6 +115,7 @@ check_and_build() {
         print_info "Build date: $BUILD_DATE"
 
         if ! go build -o "$BINARY_NAME" \
+						-trimpath \
             -ldflags "-s -w \
                       -X ${MODULE_NAME}/config.AppName=${SERVICE_NAME} \
                       -X ${MODULE_NAME}/config.Version=${VERSION} \
