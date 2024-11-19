@@ -91,6 +91,5 @@
     "max_idle_conns": 100,
     "max_idle_conns_per_host": 10
   },
-  "debug": false,
-  "last_ip_file": "/var/lib/wameter/last_state.json"
+  "debug": false
 }
