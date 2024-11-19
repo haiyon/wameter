@@ -3,7 +3,7 @@
 set -e
 
 # Configuration
-NAME="com.wameter.monitor"
+NAME="wameter"
 VENDOR="Shen"
 DESCRIPTION="IP Address Monitoring Service for ESXi"
 VERSION="1.0.0"
@@ -211,7 +211,7 @@ build_vib() {
     </urls>
     <relationships>
         <provides>
-            <name>IPMonitor</name>
+            <name>Wameter</name>
             <version>${VERSION}-${BUILD}</version>
         </provides>
         <depends/>

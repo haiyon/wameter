@@ -33,7 +33,7 @@ else
 fi
 
 BINARY_NAME="wameter"
-SERVICE_NAME="com.wameter.monitor"
+SERVICE_NAME=$BINARY_NAME
 
 # Print functions
 print_info() {

@@ -33,7 +33,7 @@ else
 fi
 
 BINARY_NAME="wameter"
-SERVICE_NAME="com.wameter.monitor"
+SERVICE_NAME=$BINARY_NAME
 
 # Print functions
 print_info() {
@@ -69,7 +69,7 @@ check_root() {
 
 # Confirm uninstall
 confirm_uninstall() {
-    print_warn "This will uninstall IPM and remove all its files."
+    print_warn "This will uninstall Wameter and remove all its files."
     read -p "Are you sure you want to continue? (y/N) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -127,7 +127,7 @@ check_installation() {
     fi
 
     if [ $installed -eq 0 ]; then
-        print_error "IPM is not installed"
+        print_error "Wameter is not installed"
         exit 1
     fi
 }
