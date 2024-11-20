@@ -331,7 +331,7 @@ create_service() {
     <key>StandardErrorPath</key>
     <string>$LOG_DIR/error.log</string>
     <key>StandardOutPath</key>
-    <string>$LOG_DIR/output.log</string>
+    <string>/dev/null</string>
     <key>WorkingDirectory</key>
     <string>$BASE_DIR</string>
 </dict>
