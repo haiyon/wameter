@@ -12,7 +12,11 @@
       "docker0",
       "veth*",
       "br-*",
-      "vmnet*"
+      "vmnet*",
+      "vEthernet*",
+      "VirtualBox*",
+      "utun*",
+      "anpi*"
     ],
     "interface_types": [
       "ethernet",
