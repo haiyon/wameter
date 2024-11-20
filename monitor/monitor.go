@@ -230,17 +230,10 @@ func (m *Monitor) checkIP(ctx context.Context) error {
 
 // handleIPChange handles IP address changes
 func (m *Monitor) handleIPChange(oldState, newState types.IPState, changes []string) error {
-	// Log changes
-	m.logger.Info("IP address changed",
-		zap.Time("time", newState.UpdatedAt),
-		zap.Int("interface_count", len(newState.InterfaceInfo)),
-		zap.Strings("changes", changes))
-
 	// Send notifications
 	if err := m.notifier.NotifyIPChange(oldState, newState, changes); err != nil {
 		return fmt.Errorf("failed to send notifications: %w", err)
 	}
-
 	return nil
 }
 
