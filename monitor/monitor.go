@@ -200,25 +200,36 @@ func (m *Monitor) checkIP(ctx context.Context) error {
 	if changed, changes := m.hasIPChanged(currentState); changed {
 		m.logger.Info("IP changes detected", zap.Strings("changes", changes))
 
-		if err := m.handleIPChange(*currentState, changes); err != nil {
+		// Update state
+		m.mu.Lock()
+		oldState := m.lastState
+		m.lastState = *currentState // Update memory state
+		m.mu.Unlock()
+
+		// Save state
+		if err := m.saveState(); err != nil {
+			// Rollback state
+			m.mu.Lock()
+			m.lastState = oldState
+			m.mu.Unlock()
+			m.metrics.RecordError(err)
+			return fmt.Errorf("failed to save state: %w", err)
+		}
+
+		if err := m.handleIPChange(oldState, *currentState, changes); err != nil {
 			m.metrics.RecordError(err)
 			return fmt.Errorf("failed to handle IP change: %w", err)
 		}
 
 		// Record metrics for IP changes
-		m.metrics.RecordIPChange(&m.lastState, currentState)
-
-		// Save state after successful change handling
-		if err := m.saveState(); err != nil {
-			m.logger.Error("Failed to save state", zap.Error(err))
-		}
+		m.metrics.RecordIPChange(&oldState, currentState)
 	}
 
 	return nil
 }
 
 // handleIPChange handles IP address changes
-func (m *Monitor) handleIPChange(newState types.IPState, changes []string) error {
+func (m *Monitor) handleIPChange(oldState, newState types.IPState, changes []string) error {
 	// Log changes
 	m.logger.Info("IP address changed",
 		zap.Time("time", newState.UpdatedAt),
@@ -226,14 +237,9 @@ func (m *Monitor) handleIPChange(newState types.IPState, changes []string) error
 		zap.Strings("changes", changes))
 
 	// Send notifications
-	if err := m.notifier.NotifyIPChange(m.lastState, newState, changes); err != nil {
+	if err := m.notifier.NotifyIPChange(oldState, newState, changes); err != nil {
 		return fmt.Errorf("failed to send notifications: %w", err)
 	}
-
-	// Update state
-	m.mu.Lock()
-	m.lastState = newState
-	m.mu.Unlock()
 
 	return nil
 }
@@ -273,11 +279,13 @@ func (m *Monitor) saveState() error {
 	// Write to temporary file first
 	tmpFile := m.config.LastIPFile + ".tmp"
 	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+		os.Remove(tmpFile)
 		return fmt.Errorf("failed to write temporary state file: %w", err)
 	}
 
 	// Rename temporary file to actual file (atomic operation)
 	if err := os.Rename(tmpFile, m.config.LastIPFile); err != nil {
+		os.Remove(tmpFile)
 		return fmt.Errorf("failed to save state file: %w", err)
 	}
 
