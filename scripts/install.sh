@@ -24,7 +24,6 @@ if [ "$IS_MACOS" -eq 1 ]; then
     CONFIG_DIR="$BASE_DIR/etc"
     LOG_DIR="$BASE_DIR/log"
     LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
-    LAUNCH_DAEMONS_DIR="/Library/LaunchDaemons"
 else
     INSTALL_DIR="/usr/local/bin"
     CONFIG_DIR="/etc/wameter"
@@ -90,42 +89,83 @@ get_arch() {
     esac
 }
 
+# Build binary
+build_binary() {
+    print_info "Binary not found, building..."
+    if ! command -v go &>/dev/null; then
+        print_error "Go is not installed"
+        exit 1
+    fi
+
+    # Set environment variables
+    export GOOS=$([ "$IS_MACOS" -eq 1 ] && echo "darwin" || echo "linux")
+    export GOARCH=$(get_arch)
+    export CGO_ENABLED=0
+
+    # Get current git commit hash and build date
+    VERSION=${VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo "1.0.0")}
+    GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    BUILD_DATE=$(date -u '+%Y-%m-%d_%H:%M:%S')
+
+    print_info "Building for GOOS=$GOOS GOARCH=$GOARCH"
+    print_info "Version: $VERSION"
+    print_info "Git commit: $GIT_COMMIT"
+    print_info "Build date: $BUILD_DATE"
+
+    if ! go build -o "$BINARY_NAME" \
+        -trimpath \
+        -mod=readonly \
+        -ldflags "-s -w -buildid= \
+                  -X ${MODULE_NAME}/config.AppName=${SERVICE_NAME} \
+                  -X ${MODULE_NAME}/config.Version=${VERSION} \
+                  -X ${MODULE_NAME}/config.GitCommit=${GIT_COMMIT} \
+                  -X ${MODULE_NAME}/config.BuildDate=${BUILD_DATE}"; then
+        print_error "Build failed"
+        exit 1
+    fi
+
+    print_info "Build successful"
+}
+
+
+# Optimize binary files using UPX
+optimize_binary() {
+    if ! command -v upx &>/dev/null; then
+        print_warn "UPX is not installed, skipping binary optimization..."
+        return 0
+    fi
+
+    if [ ! -f "$BINARY_NAME" ]; then
+        print_error "Binary file not found: $BINARY_NAME"
+        return 1
+    fi
+
+    # Detect platform
+    local platform
+    platform=$(uname -s)
+    local arch
+    arch=$(uname -m)
+
+    # Skip optimization for unsupported platforms
+    if [ "$platform" == "Darwin" ] && [[ "$arch" == "arm64" || "$arch" == "aarch64" ]]; then
+        print_warn "UPX does not support Apple Silicon (ARM64), skipping optimization..."
+        return 0
+    fi
+
+    print_info "Optimizing binary using UPX..."
+    if upx --best --lzma "$BINARY_NAME"; then
+        print_info "Binary optimized successfully"
+    else
+        print_error "Binary optimization failed"
+        return 1
+    fi
+}
+
 # Check and build binary
 check_and_build() {
     if [ ! -f "$BINARY_NAME" ]; then
-        print_info "Binary not found, building..."
-        if ! command -v go &>/dev/null; then
-            print_error "Go is not installed"
-            exit 1
-        fi
-
-        # Set environment variables
-        export GOOS=$([ "$IS_MACOS" -eq 1 ] && echo "darwin" || echo "linux")
-        export GOARCH=$(get_arch)
-        export CGO_ENABLED=0
-
-        # Get current git commit hash and build date
-        VERSION=${VERSION:-$(git describe --tags --abbrev=0 2>/dev/null || echo "1.0.0")}
-        GIT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-        BUILD_DATE=$(date -u '+%Y-%m-%d_%H:%M:%S')
-
-        print_info "Building for GOOS=$GOOS GOARCH=$GOARCH"
-        print_info "Version: $VERSION"
-        print_info "Git commit: $GIT_COMMIT"
-        print_info "Build date: $BUILD_DATE"
-
-        if ! go build -o "$BINARY_NAME" \
-						-trimpath \
-            -ldflags "-s -w \
-                      -X ${MODULE_NAME}/config.AppName=${SERVICE_NAME} \
-                      -X ${MODULE_NAME}/config.Version=${VERSION} \
-                      -X ${MODULE_NAME}/config.GitCommit=${GIT_COMMIT} \
-                      -X ${MODULE_NAME}/config.BuildDate=${BUILD_DATE}"; then
-            print_error "Build failed"
-            exit 1
-        fi
-
-        print_info "Build successful"
+        build_binary
+        optimize_binary
     else
         print_info "Binary already exists, skipping build"
         check_binary_arch
