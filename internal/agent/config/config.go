@@ -7,12 +7,14 @@ import (
 	"github.com/spf13/viper"
 )
 
+// Config represents agent configuration
 type Config struct {
 	Agent     AgentConfig     `mapstructure:"agent"`
 	Collector CollectorConfig `mapstructure:"collector"`
 	Log       LogConfig       `mapstructure:"log"`
 }
 
+// AgentConfig represents agent configuration
 type AgentConfig struct {
 	ID       string       `mapstructure:"id"`
 	Hostname string       `mapstructure:"hostname"`
@@ -20,12 +22,14 @@ type AgentConfig struct {
 	Server   ServerConfig `mapstructure:"server"`
 }
 
+// ServerConfig represents server configuration
 type ServerConfig struct {
 	Address string        `mapstructure:"address"`
 	Timeout time.Duration `mapstructure:"timeout"`
 	TLS     TLSConfig     `mapstructure:"tls"`
 }
 
+// TLSConfig represents TLS configuration
 type TLSConfig struct {
 	Enabled  bool   `mapstructure:"enabled"`
 	CertFile string `mapstructure:"cert_file"`
@@ -33,6 +37,7 @@ type TLSConfig struct {
 	CAFile   string `mapstructure:"ca_file"`
 }
 
+// CollectorConfig represents collector configuration
 type CollectorConfig struct {
 	Interval time.Duration     `mapstructure:"interval"`
 	Network  NetworkConfig     `mapstructure:"network"`
@@ -41,6 +46,7 @@ type CollectorConfig struct {
 	Tags     map[string]string `mapstructure:"tags"`
 }
 
+// NetworkConfig represents network configuration
 type NetworkConfig struct {
 	Enabled           bool          `mapstructure:"enabled"`
 	Interfaces        []string      `mapstructure:"interfaces"`
@@ -51,11 +57,13 @@ type NetworkConfig struct {
 	ExternalProviders []string      `mapstructure:"external_providers"`
 }
 
+// MetricsConfig represents metrics configuration
 type MetricsConfig struct {
 	Enabled  bool          `mapstructure:"enabled"`
 	Interval time.Duration `mapstructure:"interval"`
 }
 
+// FilterConfig represents filter configuration
 type FilterConfig struct {
 	Type    string            `mapstructure:"type"`
 	Name    string            `mapstructure:"name"`
@@ -63,6 +71,7 @@ type FilterConfig struct {
 	Rules   map[string]string `mapstructure:"rules"`
 }
 
+// LogConfig represents logging configuration
 type LogConfig struct {
 	Level      string `mapstructure:"level"`
 	File       string `mapstructure:"file"`
@@ -116,6 +125,7 @@ func LoadConfig(path string) (*Config, error) {
 	return &config, nil
 }
 
+// setDefaults sets default values if not specified
 func setDefaults(config *Config) {
 	if config.Collector.Interval == 0 {
 		config.Collector.Interval = 60 * time.Second
@@ -150,6 +160,7 @@ func setDefaults(config *Config) {
 	}
 }
 
+// validateConfig validates the configuration
 func validateConfig(config *Config) error {
 	if config.Agent.Server.Address == "" {
 		return fmt.Errorf("server address is required")

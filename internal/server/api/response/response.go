@@ -14,12 +14,12 @@ import (
 
 // Response represents standard API response
 type Response struct {
-	Code      int         `json:"code"`            // HTTP status code
-	Message   string      `json:"message"`         // Response message
-	Data      interface{} `json:"data,omitempty"`  // Response data
-	Error     string      `json:"error,omitempty"` // Error message if any
-	RequestID string      `json:"request_id"`      // Request ID for tracking
-	Timestamp time.Time   `json:"timestamp"`       // Response timestamp
+	Code      int       `json:"code"`            // HTTP status code
+	Message   string    `json:"message"`         // Response message
+	Data      any       `json:"data,omitempty"`  // Response data
+	Error     string    `json:"error,omitempty"` // Error message if any
+	RequestID string    `json:"request_id"`      // Request ID for tracking
+	Timestamp time.Time `json:"timestamp"`       // Response timestamp
 }
 
 // Handler provides methods for standard API responses
@@ -37,7 +37,7 @@ func New(c *gin.Context, logger *zap.Logger) *Handler {
 }
 
 // Success sends success response
-func (h *Handler) Success(data interface{}) {
+func (h *Handler) Success(data any) {
 	h.ctx.JSON(http.StatusOK, Response{
 		Code:      http.StatusOK,
 		Message:   "success",
@@ -48,7 +48,7 @@ func (h *Handler) Success(data interface{}) {
 }
 
 // Created sends created response
-func (h *Handler) Created(data interface{}) {
+func (h *Handler) Created(data any) {
 	h.ctx.JSON(http.StatusCreated, Response{
 		Code:      http.StatusCreated,
 		Message:   "created",
@@ -95,7 +95,7 @@ func (h *Handler) InternalError(err error) {
 }
 
 // Custom sends custom response
-func (h *Handler) Custom(status int, resp interface{}) {
+func (h *Handler) Custom(status int, resp any) {
 	h.ctx.JSON(status, resp)
 }
 
@@ -172,7 +172,7 @@ func (h *Handler) Stream(reader io.Reader, opts ...StreamOptions) {
 }
 
 // StreamJSON streams JSON data
-func (h *Handler) StreamJSON(data <-chan interface{}) {
+func (h *Handler) StreamJSON(data <-chan any) {
 	opts := StreamOptions{
 		ContentType: "application/json",
 		BufferSize:  4096,

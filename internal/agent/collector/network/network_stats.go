@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// statsCollector represents a stats collector
 type statsCollector struct {
 	config    *config.NetworkConfig
 	logger    *zap.Logger
@@ -22,6 +23,7 @@ type statsCollector struct {
 	stopChan  chan struct{}
 }
 
+// newStatsCollector creates a new stats collector
 func newStatsCollector(cfg *config.NetworkConfig, logger *zap.Logger) *statsCollector {
 	return &statsCollector{
 		config:    cfg,
@@ -32,6 +34,7 @@ func newStatsCollector(cfg *config.NetworkConfig, logger *zap.Logger) *statsColl
 	}
 }
 
+// Start starts the stats collector
 func (s *statsCollector) Start(ctx context.Context) error {
 	// Collect initial stats
 	if err := s.collect(); err != nil {
@@ -60,11 +63,13 @@ func (s *statsCollector) Start(ctx context.Context) error {
 	return nil
 }
 
+// Stop stops the stats collector
 func (s *statsCollector) Stop() error {
 	close(s.stopChan)
 	return nil
 }
 
+// GetStats returns the current stats
 func (s *statsCollector) GetStats() map[string]*types.InterfaceStats {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -79,6 +84,7 @@ func (s *statsCollector) GetStats() map[string]*types.InterfaceStats {
 	return stats
 }
 
+// collect collects network statistics
 func (s *statsCollector) collect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

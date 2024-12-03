@@ -17,6 +17,7 @@ type Config struct {
 	Log     LogConfig      `mapstructure:"log"`
 }
 
+// ServerConfig represents the server configuration
 type ServerConfig struct {
 	Address      string        `mapstructure:"address"`
 	MetricsPath  string        `mapstructure:"metrics_path"`
@@ -26,6 +27,7 @@ type ServerConfig struct {
 	TLS          TLSConfig     `mapstructure:"tls"`
 }
 
+// TLSConfig represents the TLS configuration
 type TLSConfig struct {
 	Enabled           bool   `mapstructure:"enabled"`
 	CertFile          string `mapstructure:"cert_file"`
@@ -36,6 +38,7 @@ type TLSConfig struct {
 	RequireClientCert bool   `mapstructure:"require_client_cert"`
 }
 
+// APIConfig represents the API configuration
 type APIConfig struct {
 	Enabled bool   `mapstructure:"enabled"`
 	Address string `mapstructure:"address"`
@@ -56,6 +59,7 @@ type APIConfig struct {
 	Docs DocsConfig `mapstructure:"docs"`
 }
 
+// AuthConfig represents the authentication configuration
 type AuthConfig struct {
 	Enabled      bool          `mapstructure:"enabled"`
 	Type         string        `mapstructure:"type"` // jwt, apikey, basic
@@ -64,6 +68,7 @@ type AuthConfig struct {
 	AllowedUsers []string      `mapstructure:"allowed_users"`
 }
 
+// CORSConfig represents the CORS configuration
 type CORSConfig struct {
 	Enabled          bool     `mapstructure:"enabled"`
 	AllowedOrigins   []string `mapstructure:"allowed_origins"`
@@ -73,6 +78,7 @@ type CORSConfig struct {
 	AllowCredentials bool     `mapstructure:"allow_credentials"`
 }
 
+// RateLimitConfig represents the rate limiting configuration
 type RateLimitConfig struct {
 	Enabled  bool          `mapstructure:"enabled"`
 	Requests int           `mapstructure:"requests"`
@@ -80,6 +86,7 @@ type RateLimitConfig struct {
 	Strategy string        `mapstructure:"strategy"` // token, leaky, sliding
 }
 
+// MetricsConfig represents the metrics configuration
 type MetricsConfig struct {
 	Enabled     bool   `mapstructure:"enabled"`
 	Path        string `mapstructure:"path"`
@@ -88,6 +95,7 @@ type MetricsConfig struct {
 	ServiceName string `mapstructure:"service_name"`
 }
 
+// DocsConfig represents the documentation configuration
 type DocsConfig struct {
 	Enabled bool   `mapstructure:"enabled"`
 	Path    string `mapstructure:"path"`
@@ -95,6 +103,7 @@ type DocsConfig struct {
 	Version string `mapstructure:"version"`
 }
 
+// NotifyConfig represents the notification configuration
 type NotifyConfig struct {
 	Email    EmailConfig    `mapstructure:"email"`
 	Telegram TelegramConfig `mapstructure:"telegram"`
@@ -102,6 +111,7 @@ type NotifyConfig struct {
 	Slack    SlackConfig    `mapstructure:"slack"`
 }
 
+// EmailConfig represents the email notification configuration
 type EmailConfig struct {
 	Enabled    bool              `mapstructure:"enabled"`
 	SMTPServer string            `mapstructure:"smtp_server"`
@@ -114,6 +124,7 @@ type EmailConfig struct {
 	Templates  map[string]string `mapstructure:"templates"`
 }
 
+// TelegramConfig represents the telegram notification configuration
 type TelegramConfig struct {
 	Enabled  bool     `mapstructure:"enabled"`
 	BotToken string   `mapstructure:"bot_token"`
@@ -121,17 +132,19 @@ type TelegramConfig struct {
 	Format   string   `mapstructure:"format"` // text, html, markdown
 }
 
+// WebhookConfig represents the webhook notification configuration
 type WebhookConfig struct {
-	Enabled    bool                   `mapstructure:"enabled"`
-	URL        string                 `mapstructure:"url"`
-	Secret     string                 `mapstructure:"secret"`
-	Method     string                 `mapstructure:"method"`
-	Timeout    time.Duration          `mapstructure:"timeout"`
-	MaxRetries int                    `mapstructure:"max_retries"`
-	Headers    map[string]string      `mapstructure:"headers"`
-	CommonData map[string]interface{} `mapstructure:"common_data"`
+	Enabled    bool              `mapstructure:"enabled"`
+	URL        string            `mapstructure:"url"`
+	Secret     string            `mapstructure:"secret"`
+	Method     string            `mapstructure:"method"`
+	Timeout    time.Duration     `mapstructure:"timeout"`
+	MaxRetries int               `mapstructure:"max_retries"`
+	Headers    map[string]string `mapstructure:"headers"`
+	CommonData map[string]any    `mapstructure:"common_data"`
 }
 
+// SlackConfig represents the slack notification configuration
 type SlackConfig struct {
 	Enabled    bool   `mapstructure:"enabled"`
 	WebhookURL string `mapstructure:"webhook_url"`
@@ -140,6 +153,7 @@ type SlackConfig struct {
 	IconEmoji  string `mapstructure:"icon_emoji"`
 }
 
+// LogConfig represents the logging configuration
 type LogConfig struct {
 	Level      string `mapstructure:"level"`
 	Format     string `mapstructure:"format"` // json, console

@@ -47,7 +47,7 @@ func New() *Validator {
 }
 
 // Struct validates a struct
-func (v *Validator) Struct(s interface{}) error {
+func (v *Validator) Struct(s any) error {
 	if err := v.validate.Struct(s); err != nil {
 		if _, ok := err.(*validator.InvalidValidationError); ok {
 			return fmt.Errorf("invalid validation error: %w", err)
@@ -63,12 +63,12 @@ func (v *Validator) Struct(s interface{}) error {
 }
 
 // Var validates a single variable
-func (v *Validator) Var(field interface{}, tag string) error {
+func (v *Validator) Var(field any, tag string) error {
 	return v.validate.Var(field, tag)
 }
 
 // Engine returns the underlying validator engine
-func (v *Validator) Engine() interface{} {
+func (v *Validator) Engine() any {
 	return v.validate
 }
 
@@ -116,6 +116,7 @@ func validateMAC(fl validator.FieldLevel) bool {
 	return true
 }
 
+// Custom validation functions
 func validateHostname(fl validator.FieldLevel) bool {
 	hostname := fl.Field().String()
 	if hostname == "" {
@@ -139,6 +140,7 @@ func validateHostname(fl validator.FieldLevel) bool {
 // TimeType is a placeholder type for time validation
 type TimeType struct{}
 
-func validateTime(field reflect.Value) interface{} {
+// ValidateTime returns the value as is
+func validateTime(field reflect.Value) any {
 	return field.Interface()
 }

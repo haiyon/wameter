@@ -14,6 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Service represents the server service
 type Service struct {
 	config   *config.Config
 	storage  storage.Storage
@@ -26,7 +27,7 @@ type Service struct {
 	cleanupFn  context.CancelFunc
 }
 
-// NewService creates a new service instance
+// NewService creates new service instance
 func NewService(cfg *config.Config, store storage.Storage, logger *zap.Logger) (*Service, error) {
 	// Initialize notifier
 	notifier, err := notify.NewManager(cfg.Notify, logger)
@@ -128,7 +129,7 @@ func (s *Service) GetAgent(ctx context.Context, agentID string) (*types.AgentInf
 }
 
 // SendCommand sends a command to an agent
-func (s *Service) SendCommand(ctx context.Context, agentID string, cmdType string, payload interface{}) error {
+func (s *Service) SendCommand(ctx context.Context, agentID string, cmdType string, payload any) error {
 	s.agentsMu.RLock()
 	agent, exists := s.agents[agentID]
 	s.agentsMu.RUnlock()
@@ -183,6 +184,7 @@ func (s *Service) startCleanupTask() {
 	}
 }
 
+// startAgentMonitoring starts a background task to monitor agent statuses
 func (s *Service) startAgentMonitoring() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
@@ -197,6 +199,7 @@ func (s *Service) startAgentMonitoring() {
 	}
 }
 
+// checkAgentStatuses checks agent statuses
 func (s *Service) checkAgentStatuses() {
 	s.agentsMu.Lock()
 	defer s.agentsMu.Unlock()
@@ -217,6 +220,7 @@ func (s *Service) checkAgentStatuses() {
 	}
 }
 
+// updateAgentStatus updates the status of an agent
 func (s *Service) updateAgentStatus(agentID string, status types.AgentStatus) {
 	s.agentsMu.Lock()
 	defer s.agentsMu.Unlock()
@@ -261,6 +265,7 @@ func (s *Service) updateAgentStatus(agentID string, status types.AgentStatus) {
 	}()
 }
 
+// processMetricsNotifications processes metrics notifications
 func (s *Service) processMetricsNotifications(data *types.MetricsData) {
 	// Process network metrics for notifications
 	if data.Metrics.Network != nil {
@@ -281,6 +286,7 @@ func (s *Service) processMetricsNotifications(data *types.MetricsData) {
 	}
 }
 
+// checkStorageHealth checks the storage health
 func (s *Service) checkStorageHealth(ctx context.Context) error {
 	// Simple storage health check
 	_, err := s.storage.GetAgents(ctx)
@@ -300,6 +306,7 @@ type HealthStatus struct {
 	Details   []HealthDetail `json:"details,omitempty"`
 }
 
+// HealthDetail represents a health detail
 type HealthDetail struct {
 	Component string `json:"component"`
 	Status    string `json:"status"`

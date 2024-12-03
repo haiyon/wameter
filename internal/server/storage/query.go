@@ -29,7 +29,7 @@ type MetricsQuery struct {
 // QueryBuilder represents query builder
 type QueryBuilder struct {
 	sql      strings.Builder
-	args     []interface{}
+	args     []any
 	argIndex int
 }
 
@@ -46,7 +46,7 @@ func (qb *QueryBuilder) SQL() string {
 }
 
 // Args returns query arguments
-func (qb *QueryBuilder) Args() []interface{} {
+func (qb *QueryBuilder) Args() []any {
 	return qb.args
 }
 
@@ -65,7 +65,7 @@ func (qb *QueryBuilder) From(table string) *QueryBuilder {
 }
 
 // Where adds WHERE clause with placeholder
-func (qb *QueryBuilder) Where(cond string, args ...interface{}) *QueryBuilder {
+func (qb *QueryBuilder) Where(cond string, args ...any) *QueryBuilder {
 	if !strings.Contains(qb.sql.String(), "WHERE") {
 		qb.sql.WriteString(" WHERE ")
 	} else {
@@ -114,7 +114,7 @@ func (qb *QueryBuilder) String() string {
 }
 
 // Having adds HAVING
-func (qb *QueryBuilder) Having(cond string, args ...interface{}) *QueryBuilder {
+func (qb *QueryBuilder) Having(cond string, args ...any) *QueryBuilder {
 	qb.sql.WriteString(" HAVING ")
 	qb.sql.WriteString(cond)
 	qb.args = append(qb.args, args...)
@@ -140,7 +140,7 @@ func (qb *QueryBuilder) Union(unionType string, subQuery string) *QueryBuilder {
 }
 
 // Raw adds raw SQL
-func (qb *QueryBuilder) Raw(sql string, args ...interface{}) *QueryBuilder {
+func (qb *QueryBuilder) Raw(sql string, args ...any) *QueryBuilder {
 	qb.sql.WriteString(sql)
 	qb.args = append(qb.args, args...)
 	return qb

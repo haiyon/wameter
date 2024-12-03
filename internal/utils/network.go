@@ -152,26 +152,6 @@ func IsPhysicalInterface(name string, flags net.Flags) bool {
 	return isPhysical && hasValidFlags
 }
 
-// // Common network statistics file names in Linux
-// var networkStatFiles = []string{
-// 	"rx_bytes",
-// 	"tx_bytes",
-// 	"rx_packets",
-// 	"tx_packets",
-// 	"rx_errors",
-// 	"tx_errors",
-// 	"rx_dropped",
-// 	"tx_dropped",
-// 	"rx_fifo_errors",
-// 	"tx_fifo_errors",
-// 	"rx_frame_errors",
-// 	"tx_carrier_errors",
-// 	"rx_compressed",
-// 	"tx_compressed",
-// 	"multicast",
-// 	"collisions",
-// }
-
 // GetInterfaceStats retrieves interface statistics
 func GetInterfaceStats(name string) (*types.InterfaceStats, error) {
 	stats := &types.InterfaceStats{

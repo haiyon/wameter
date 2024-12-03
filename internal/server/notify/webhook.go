@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// WebhookNotifier represents  webhook notifier
 type WebhookNotifier struct {
 	config *config.WebhookConfig
 	logger *zap.Logger
@@ -24,15 +25,16 @@ type WebhookNotifier struct {
 
 // WebhookPayload represents the standard webhook payload structure
 type WebhookPayload struct {
-	EventType   string      `json:"event_type"`
-	EventID     string      `json:"event_id"`
-	Timestamp   time.Time   `json:"timestamp"`
-	Data        interface{} `json:"data"`
-	AgentID     string      `json:"agent_id,omitempty"`
-	Hostname    string      `json:"hostname,omitempty"`
-	Environment string      `json:"environment,omitempty"`
+	EventType   string    `json:"event_type"`
+	EventID     string    `json:"event_id"`
+	Timestamp   time.Time `json:"timestamp"`
+	Data        any       `json:"data"`
+	AgentID     string    `json:"agent_id,omitempty"`
+	Hostname    string    `json:"hostname,omitempty"`
+	Environment string    `json:"environment,omitempty"`
 }
 
+// NewWebhookNotifier creates new webhook notifier
 func NewWebhookNotifier(cfg *config.WebhookConfig, logger *zap.Logger) (*WebhookNotifier, error) {
 	client := &http.Client{
 		Timeout: time.Duration(cfg.Timeout),
@@ -52,6 +54,7 @@ func NewWebhookNotifier(cfg *config.WebhookConfig, logger *zap.Logger) (*Webhook
 	}, nil
 }
 
+// NotifyAgentOffline sends an agent offline notification
 func (w *WebhookNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	payload := WebhookPayload{
 		EventType: "agent.offline",
@@ -59,7 +62,7 @@ func (w *WebhookNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 		Timestamp: time.Now(),
 		AgentID:   agent.ID,
 		Hostname:  agent.Hostname,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"status":    agent.Status,
 			"last_seen": agent.LastSeen,
 			"version":   agent.Version,
@@ -70,13 +73,14 @@ func (w *WebhookNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	return w.sendWebhook(payload)
 }
 
+// NotifyNetworkErrors sends a network errors notification
 func (w *WebhookNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
 	payload := WebhookPayload{
 		EventType: "network.errors",
 		EventID:   generateEventID(),
 		Timestamp: time.Now(),
 		AgentID:   agentID,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"interface": iface.Name,
 			"type":      iface.Type,
 			"stats": map[string]uint64{
@@ -91,16 +95,17 @@ func (w *WebhookNotifier) NotifyNetworkErrors(agentID string, iface *types.Inter
 	return w.sendWebhook(payload)
 }
 
+// NotifyHighNetworkUtilization sends a high network utilization notification
 func (w *WebhookNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
 	payload := WebhookPayload{
 		EventType: "network.high_utilization",
 		EventID:   generateEventID(),
 		Timestamp: time.Now(),
 		AgentID:   agentID,
-		Data: map[string]interface{}{
+		Data: map[string]any{
 			"interface": iface.Name,
 			"type":      iface.Type,
-			"stats": map[string]interface{}{
+			"stats": map[string]any{
 				"rx_rate":     iface.Statistics.RxBytesRate,
 				"tx_rate":     iface.Statistics.TxBytesRate,
 				"rx_total":    iface.Statistics.RxBytes,
@@ -113,6 +118,7 @@ func (w *WebhookNotifier) NotifyHighNetworkUtilization(agentID string, iface *ty
 	return w.sendWebhook(payload)
 }
 
+// sendWebhook sends a webhook
 func (w *WebhookNotifier) sendWebhook(payload WebhookPayload) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -122,7 +128,7 @@ func (w *WebhookNotifier) sendWebhook(payload WebhookPayload) error {
 	// Add common data from config
 	if w.config.CommonData != nil {
 		for k, v := range w.config.CommonData {
-			payload.Data.(map[string]interface{})[k] = v
+			payload.Data.(map[string]any)[k] = v
 		}
 	}
 
@@ -178,17 +184,19 @@ func (w *WebhookNotifier) sendWebhook(payload WebhookPayload) error {
 	return nil
 }
 
-// Helper functions
+// generateEventID generates a random event ID
 func generateEventID() string {
 	return fmt.Sprintf("%d-%x", time.Now().UnixMilli(), randomBytes(4))
 }
 
+// calculateSignature calculates the signature
 func calculateSignature(payload []byte, secret []byte) string {
 	h := hmac.New(sha256.New, secret)
 	h.Write(payload)
 	return hex.EncodeToString(h.Sum(nil))
 }
 
+// calculateBackoff calculates the backoff
 func calculateBackoff(attempt int) time.Duration {
 	backoff := time.Duration(attempt*attempt) * time.Second
 	if backoff > 30*time.Second {
@@ -197,6 +205,7 @@ func calculateBackoff(attempt int) time.Duration {
 	return backoff
 }
 
+// calculateUtilization calculates the utilization
 func calculateUtilization(iface *types.InterfaceInfo) float64 {
 	if iface.Statistics.Speed <= 0 {
 		return 0
@@ -208,6 +217,7 @@ func calculateUtilization(iface *types.InterfaceInfo) float64 {
 	return (totalRate / maxRate) * 100
 }
 
+// randomBytes generates random bytes
 func randomBytes(n int) []byte {
 	b := make([]byte, n)
 	_, err := rand.Read(b)

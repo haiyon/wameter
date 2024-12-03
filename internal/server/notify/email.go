@@ -14,12 +14,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// EmailNotifier represents an email notifier
 type EmailNotifier struct {
 	config *config.EmailConfig
 	logger *zap.Logger
 	tmpl   *template.Template
 }
 
+// NewEmailNotifier creates new email notifier
 func NewEmailNotifier(cfg *config.EmailConfig, logger *zap.Logger) (*EmailNotifier, error) {
 	// Parse email templates
 	tmpl, err := template.New("email").Funcs(template.FuncMap{
@@ -39,6 +41,7 @@ func NewEmailNotifier(cfg *config.EmailConfig, logger *zap.Logger) (*EmailNotifi
 	}, nil
 }
 
+// NotifyAgentOffline sends an email notification
 func (n *EmailNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	data := struct {
 		Agent     *types.AgentInfo
@@ -52,6 +55,7 @@ func (n *EmailNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	return n.sendEmail(subject, "agent_offline", data)
 }
 
+// NotifyNetworkErrors sends an email notification
 func (n *EmailNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
 	data := struct {
 		AgentID   string
@@ -67,6 +71,7 @@ func (n *EmailNotifier) NotifyNetworkErrors(agentID string, iface *types.Interfa
 	return n.sendEmail(subject, "network_errors", data)
 }
 
+// NotifyHighNetworkUtilization sends an email notification
 func (n *EmailNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
 	data := struct {
 		AgentID   string
@@ -82,7 +87,8 @@ func (n *EmailNotifier) NotifyHighNetworkUtilization(agentID string, iface *type
 	return n.sendEmail(subject, "high_utilization", data)
 }
 
-func (n *EmailNotifier) sendEmail(subject, templateName string, data interface{}) error {
+// sendEmail sends an email
+func (n *EmailNotifier) sendEmail(subject, templateName string, data any) error {
 	var body bytes.Buffer
 	if err := n.tmpl.ExecuteTemplate(&body, templateName, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -152,7 +158,7 @@ func (n *EmailNotifier) sendEmail(subject, templateName string, data interface{}
 	return nil
 }
 
-// Helper function for template
+// formatTime formats a time.Time as a string with the format "2006-01-02 15:04:05"
 func formatTime(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05")
 }

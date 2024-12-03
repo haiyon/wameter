@@ -221,7 +221,7 @@ func (s *BaseStorage) WithTransaction(ctx context.Context, fn TxFn) error {
 }
 
 // ExecContext executes a query
-func (s *BaseStorage) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (s *BaseStorage) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	// Timeout
 	ctx, cancel := context.WithTimeout(ctx, s.opts.QueryTimeout)
 	defer cancel()
@@ -250,7 +250,7 @@ func (s *BaseStorage) ExecContext(ctx context.Context, query string, args ...int
 }
 
 // QueryContext executes a query
-func (s *BaseStorage) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+func (s *BaseStorage) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	// Timeout
 	ctx, cancel := context.WithTimeout(ctx, s.opts.QueryTimeout)
 	defer cancel()

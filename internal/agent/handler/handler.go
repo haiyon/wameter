@@ -25,7 +25,7 @@ type Handler struct {
 	manager    *collector.Manager
 }
 
-// NewHandler creates a new Handler instance
+// NewHandler creates new Handler instance
 func NewHandler(cfg *config.Config, logger *zap.Logger, cm *collector.Manager) *Handler {
 	h := &Handler{
 		config:     cfg,
@@ -49,7 +49,7 @@ func NewHandler(cfg *config.Config, logger *zap.Logger, cm *collector.Manager) *
 	return h
 }
 
-// RegisterCollector registers a collector with the handler
+// RegisterCollector registers collector with the handler
 func (h *Handler) RegisterCollector(name string, c collector.Collector) error {
 	if _, exists := h.collectors[name]; exists {
 		return fmt.Errorf("collector %s already registered", name)

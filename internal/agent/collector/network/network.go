@@ -18,7 +18,8 @@ import (
 	"go.uber.org/zap"
 )
 
-type Collector struct {
+// networkCollector represents a network collector
+type networkCollector struct {
 	config    *config.NetworkConfig
 	logger    *zap.Logger
 	stats     *statsCollector
@@ -28,8 +29,8 @@ type Collector struct {
 }
 
 // NewCollector creates a new network collector
-func NewCollector(cfg *config.NetworkConfig, logger *zap.Logger) *Collector {
-	return &Collector{
+func NewCollector(cfg *config.NetworkConfig, logger *zap.Logger) *networkCollector {
+	return &networkCollector{
 		config:   cfg,
 		logger:   logger,
 		stopChan: make(chan struct{}),
@@ -38,12 +39,12 @@ func NewCollector(cfg *config.NetworkConfig, logger *zap.Logger) *Collector {
 }
 
 // Name returns the collector name
-func (c *Collector) Name() string {
+func (c *networkCollector) Name() string {
 	return "network"
 }
 
 // Start starts the collector
-func (c *Collector) Start(ctx context.Context) error {
+func (c *networkCollector) Start(ctx context.Context) error {
 	if !c.config.Enabled {
 		c.logger.Info("Network collector is disabled")
 		return nil
@@ -58,13 +59,13 @@ func (c *Collector) Start(ctx context.Context) error {
 }
 
 // Stop stops the collector
-func (c *Collector) Stop() error {
+func (c *networkCollector) Stop() error {
 	close(c.stopChan)
 	return c.stats.Stop()
 }
 
 // Collect performs a single collection
-func (c *Collector) Collect(ctx context.Context) (*types.MetricsData, error) {
+func (c *networkCollector) Collect(ctx context.Context) (*types.MetricsData, error) {
 	if !c.config.Enabled {
 		return nil, nil
 	}
@@ -119,7 +120,8 @@ func (c *Collector) Collect(ctx context.Context) (*types.MetricsData, error) {
 	}, nil
 }
 
-func (c *Collector) collectInterfaces(state *types.NetworkState) error {
+// collectInterfaces collects interface information
+func (c *networkCollector) collectInterfaces(state *types.NetworkState) error {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return fmt.Errorf("failed to get interfaces: %w", err)
@@ -170,7 +172,8 @@ func (c *Collector) collectInterfaces(state *types.NetworkState) error {
 	return nil
 }
 
-func (c *Collector) shouldMonitorInterface(iface net.Interface) bool {
+// shouldMonitorInterface returns true if the interface should be monitored
+func (c *networkCollector) shouldMonitorInterface(iface net.Interface) bool {
 	// Check if interface is in configured list
 	if len(c.config.Interfaces) > 0 {
 		found := false
@@ -201,7 +204,7 @@ func (c *Collector) shouldMonitorInterface(iface net.Interface) bool {
 }
 
 // getExternalIP attempts to get the external IP using configured providers
-func (c *Collector) getExternalIP(ctx context.Context) (string, error) {
+func (c *networkCollector) getExternalIP(ctx context.Context) (string, error) {
 	if len(c.config.ExternalProviders) == 0 {
 		return "", fmt.Errorf("no external IP providers configured")
 	}
@@ -263,7 +266,7 @@ func (c *Collector) getExternalIP(ctx context.Context) (string, error) {
 }
 
 // queryExternalProvider queries a single external IP provider
-func (c *Collector) queryExternalProvider(ctx context.Context, provider string) (string, error) {
+func (c *networkCollector) queryExternalProvider(ctx context.Context, provider string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, provider, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)

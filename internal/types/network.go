@@ -109,10 +109,12 @@ type MetricsData struct {
 	} `json:"metrics"`
 }
 
+// ToJSON converts MetricsData to JSON
 func (m *MetricsData) ToJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
+// FromJSON converts JSON to MetricsData
 func (m *MetricsData) FromJSON(data []byte) error {
 	return json.Unmarshal(data, m)
 }

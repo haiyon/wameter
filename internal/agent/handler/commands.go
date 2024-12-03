@@ -11,13 +11,16 @@ import (
 	"go.uber.org/zap"
 )
 
+// Command represents an agent command
 type Command struct {
 	Type    string          `json:"type"`
 	Payload json.RawMessage `json:"payload"`
 }
 
+// CommandHandler represents function that handles an agent command
 type CommandHandler func(context.Context, Command) error
 
+// CommandResponse represents the response structure for agent commands
 type CommandResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message,omitempty"`
@@ -26,14 +29,14 @@ type CommandResponse struct {
 
 // CommandPayload represents the standard command payload structure
 type CommandPayload struct {
-	Args map[string]interface{} `json:"args"`
+	Args map[string]any `json:"args"`
 }
 
-// CommandResult represents the result of a command execution
+// CommandResult represents the result of command execution
 type CommandResult struct {
-	Success bool        `json:"success"`
-	Data    interface{} `json:"data,omitempty"`
-	Error   string      `json:"error,omitempty"`
+	Success bool   `json:"success"`
+	Data    any    `json:"data,omitempty"`
+	Error   string `json:"error,omitempty"`
 }
 
 // handleConfigReload implements configuration reload command
@@ -71,7 +74,7 @@ func (h *Handler) handleConfigReload(ctx context.Context, cmd Command) error {
 	return nil
 }
 
-// handleCollectorRestart implements collector restart command
+// handleCollectorRestart handles collector restart command
 func (h *Handler) handleCollectorRestart(ctx context.Context, cmd Command) error {
 	var payload CommandPayload
 	if err := json.Unmarshal(cmd.Payload, &payload); err != nil {
@@ -110,7 +113,7 @@ func (h *Handler) handleCollectorRestart(ctx context.Context, cmd Command) error
 	return nil
 }
 
-// handleUpdateAgent implements agent update command
+// handleUpdateAgent handles agent update command
 func (h *Handler) handleUpdateAgent(ctx context.Context, cmd Command) error {
 	var payload CommandPayload
 	if err := json.Unmarshal(cmd.Payload, &payload); err != nil {
@@ -152,13 +155,13 @@ func (h *Handler) handleUpdateAgent(ctx context.Context, cmd Command) error {
 	return nil
 }
 
-// Helper functions
-
+// validateNewConfig validates new configuration
 func validateNewConfig(cfg *config.Config) error {
 	// Add validation logic here
 	return nil
 }
 
+// backupConfig creates backup of the current configuration
 func backupConfig(configPath string) error {
 	backupPath := configPath + fmt.Sprintf(".backup.%d", time.Now().Unix())
 	data, err := os.ReadFile(configPath)
@@ -168,16 +171,19 @@ func backupConfig(configPath string) error {
 	return os.WriteFile(backupPath, data, 0644)
 }
 
+// fetchUpdate fetches update package
 func (h *Handler) fetchUpdate(version string) ([]byte, error) {
 	// Add update fetching logic here
 	return nil, fmt.Errorf("not implemented")
 }
 
+// verifyUpdate verifies update package
 func (h *Handler) verifyUpdate(pkg []byte) error {
 	// Add update verification logic here
 	return fmt.Errorf("not implemented")
 }
 
+// applyUpdate applies update
 func (h *Handler) applyUpdate(pkg []byte) error {
 	// Add update application logic here
 	return fmt.Errorf("not implemented")

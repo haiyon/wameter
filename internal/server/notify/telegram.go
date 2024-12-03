@@ -15,18 +15,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// TelegramNotifier represents telegram notifier
 type TelegramNotifier struct {
 	config *config.TelegramConfig
 	logger *zap.Logger
 	client *http.Client
 }
 
-type telegramMessage struct {
-	ChatID    string `json:"chat_id"`
-	Text      string `json:"text"`
-	ParseMode string `json:"parse_mode"`
-}
-
+// NewTelegramNotifier creates new telegram notifier
 func NewTelegramNotifier(cfg *config.TelegramConfig, logger *zap.Logger) (*TelegramNotifier, error) {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -43,6 +39,7 @@ func NewTelegramNotifier(cfg *config.TelegramConfig, logger *zap.Logger) (*Teleg
 	}, nil
 }
 
+// NotifyAgentOffline sends an agent offline notification
 func (n *TelegramNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	message := fmt.Sprintf(
 		"🔴 *Agent Offline Alert*\n\n"+
@@ -60,6 +57,7 @@ func (n *TelegramNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	return n.sendToAll(message)
 }
 
+// NotifyNetworkErrors sends a network errors notification
 func (n *TelegramNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
 	message := fmt.Sprintf(
 		"⚠️ *Network Errors Alert*\n\n"+
@@ -82,6 +80,7 @@ func (n *TelegramNotifier) NotifyNetworkErrors(agentID string, iface *types.Inte
 	return n.sendToAll(message)
 }
 
+// NotifyHighNetworkUtilization sends a high network utilization notification
 func (n *TelegramNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
 	message := fmt.Sprintf(
 		"📈 *High Network Utilization*\n\n"+
@@ -106,6 +105,7 @@ func (n *TelegramNotifier) NotifyHighNetworkUtilization(agentID string, iface *t
 	return n.sendToAll(message)
 }
 
+// NotifyAgentOnline sends an agent online notification
 func (n *TelegramNotifier) sendToAll(text string) error {
 	var errors []string
 
@@ -122,6 +122,14 @@ func (n *TelegramNotifier) sendToAll(text string) error {
 	return nil
 }
 
+// telegramMessage represents telegram message
+type telegramMessage struct {
+	ChatID    string `json:"chat_id"`
+	Text      string `json:"text"`
+	ParseMode string `json:"parse_mode"`
+}
+
+// sendMessage sends a message
 func (n *TelegramNotifier) sendMessage(chatID string, text string) error {
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", n.config.BotToken)
 

@@ -8,18 +8,21 @@ import (
 	"go.uber.org/zap"
 )
 
-type Manager struct {
-	config    *config.NotifyConfig
-	logger    *zap.Logger
-	notifiers []Notifier
-}
-
+// Notifier represents notifier interface
 type Notifier interface {
 	NotifyAgentOffline(agent *types.AgentInfo) error
 	NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error
 	NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error
 }
 
+// Manager represents notifier manager
+type Manager struct {
+	config    *config.NotifyConfig
+	logger    *zap.Logger
+	notifiers []Notifier
+}
+
+// NewManager creates new notifier manager
 func NewManager(cfg config.NotifyConfig, logger *zap.Logger) (*Manager, error) {
 	m := &Manager{
 		config: &cfg,
@@ -47,6 +50,7 @@ func NewManager(cfg config.NotifyConfig, logger *zap.Logger) (*Manager, error) {
 	return m, nil
 }
 
+// NotifyAgentOffline sends an agent offline notification
 func (m *Manager) NotifyAgentOffline(agent *types.AgentInfo) {
 	for _, n := range m.notifiers {
 		if err := n.NotifyAgentOffline(agent); err != nil {
@@ -57,6 +61,7 @@ func (m *Manager) NotifyAgentOffline(agent *types.AgentInfo) {
 	}
 }
 
+// NotifyNetworkErrors sends a network errors notification
 func (m *Manager) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) {
 	for _, n := range m.notifiers {
 		if err := n.NotifyNetworkErrors(agentID, iface); err != nil {
@@ -68,6 +73,7 @@ func (m *Manager) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo
 	}
 }
 
+// NotifyHighNetworkUtilization sends a high network utilization notification
 func (m *Manager) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) {
 	for _, n := range m.notifiers {
 		if err := n.NotifyHighNetworkUtilization(agentID, iface); err != nil {

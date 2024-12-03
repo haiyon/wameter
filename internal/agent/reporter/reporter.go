@@ -15,6 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
+// Reporter implements Reporter interface
 type Reporter struct {
 	config   *config.Config
 	logger   *zap.Logger
@@ -24,6 +25,7 @@ type Reporter struct {
 	wg       sync.WaitGroup
 }
 
+// NewReporter creates new reporter
 func NewReporter(cfg *config.Config, logger *zap.Logger) *Reporter {
 	// Create HTTP client with TLS config if needed
 	transport := &http.Transport{
@@ -56,18 +58,21 @@ func NewReporter(cfg *config.Config, logger *zap.Logger) *Reporter {
 	}
 }
 
+// Start starts the reporter
 func (r *Reporter) Start(ctx context.Context) error {
 	r.wg.Add(1)
 	go r.processLoop(ctx)
 	return nil
 }
 
+// Stop stops the reporter
 func (r *Reporter) Stop() error {
 	close(r.stopChan)
 	r.wg.Wait()
 	return nil
 }
 
+// Report sends metrics data
 func (r *Reporter) Report(data *types.MetricsData) error {
 	select {
 	case r.buffer <- data:
@@ -96,6 +101,7 @@ func (r *Reporter) processLoop(ctx context.Context) {
 	}
 }
 
+// sendData sends metrics data
 func (r *Reporter) sendData(ctx context.Context, data *types.MetricsData) error {
 	// Add agent metadata
 	data.AgentID = r.config.Agent.ID
@@ -131,6 +137,7 @@ func (r *Reporter) sendData(ctx context.Context, data *types.MetricsData) error 
 	return nil
 }
 
+// createTLSConfig creates TLS config
 func createTLSConfig(cfg config.TLSConfig) (*tls.Config, error) {
 	// Load client certificate
 	cert, err := tls.LoadX509KeyPair(cfg.CertFile, cfg.KeyFile)

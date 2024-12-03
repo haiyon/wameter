@@ -166,8 +166,8 @@ func (api *API) sendCommand(c *gin.Context) {
 
 	agentID := c.Param("id")
 	var cmd struct {
-		Type    string      `json:"type" binding:"required"`
-		Payload interface{} `json:"payload"`
+		Type    string `json:"type" binding:"required"`
+		Payload any    `json:"payload"`
 	}
 
 	if err := c.ShouldBindJSON(&cmd); err != nil {
