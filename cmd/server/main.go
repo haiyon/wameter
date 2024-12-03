@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -105,9 +106,15 @@ func main() {
 }
 
 func initLogger(cfg config.LogConfig) (*zap.Logger, error) {
-	// Create log directory if needed
-	if err := os.MkdirAll(cfg.File, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	// Check if the log file path exists
+	_, err := os.Stat(cfg.File)
+	if os.IsNotExist(err) {
+		// Create the directory if it doesn't exist
+		if err := os.MkdirAll(filepath.Dir(cfg.File), 0755); err != nil {
+			return nil, fmt.Errorf("failed to create log directory: %w", err)
+		}
+	} else if err != nil {
+		return nil, fmt.Errorf("failed to check log file path: %w", err)
 	}
 
 	// Configure log rotation

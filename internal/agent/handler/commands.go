@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/haiyon/wameter/internal/agent/config"
+	commonCfg "github.com/haiyon/wameter/internal/config"
 	"go.uber.org/zap"
 )
 
@@ -48,7 +49,7 @@ func (h *Handler) handleConfigReload(ctx context.Context, cmd Command) error {
 
 	configPath, _ := payload.Args["config_path"].(string)
 	if configPath == "" {
-		configPath = "/etc/wameter/agent.yaml" // default path
+		configPath = fmt.Sprintf("/etc/%s/agent.yaml", commonCfg.AppName) // default path
 	}
 
 	// Load new configuration
