@@ -1,0 +1,82 @@
+# Wameter Agent Configuration
+agent:
+  # Unique agent identifier, required
+  id: "agent-1"
+  # Agent hostname (optional, defaults to system hostname)
+  hostname: "host-1"
+  # HTTP API port for agent
+  port: 8081
+
+  # Server connection settings
+  server:
+    # Server address with protocol
+    address: "http://localhost:8080"
+    # Connection timeout
+    timeout: 30s
+    # TLS settings
+    tls:
+      enabled: false
+      cert_file: "/etc/wameter/client.crt"
+      key_file: "/etc/wameter/client.key"
+      ca_file: "/etc/wameter/ca.crt"
+      # Skip TLS verification (not recommended for production)
+      insecure_skip_verify: false
+
+# Collector settings
+collector:
+  # Global collection interval
+  interval: 30s
+
+  # Network collector settings
+  network:
+    enabled: true
+    # Network interfaces to monitor
+    interfaces:
+      - eth0
+      - wlan0
+    # Exclude interface patterns
+    exclude_patterns:
+      - "docker*"
+      - "veth*"
+      - "br-*"
+    # Include virtual interfaces
+    include_virtual: false
+    # Check external IP
+    check_external_ip: true
+    # Statistics collection interval
+    stat_interval: 10s
+    # External IP providers
+    external_providers:
+      - "https://api.ipify.org"
+      - "https://ifconfig.me/ip"
+      - "https://icanhazip.com"
+    # IP version settings
+    ip_version:
+      enable_ipv4: true
+      enable_ipv6: true
+      prefer_ipv6: false
+
+  # Metrics collection settings
+  metrics:
+    enabled: true
+    interval: 60s
+    # Buffer size for collected metrics
+    buffer_size: 1000
+    # Batch size for sending metrics
+    batch_size: 100
+
+# Logging configuration
+log:
+  # Log level: debug, info, warn, error
+  level: "info"
+  # Log format: json, console
+  format: "json"
+  # Log file path
+  file: "/var/log/wameter/agent.log"
+  # Log rotation settings
+  max_size: 100    # Maximum size in MB before rotation
+  max_backups: 7   # Maximum number of old log files
+  max_age: 30      # Maximum number of days to retain logs
+  compress: true   # Compress rotated logs
+  # Enable console color
+  color: true

@@ -1,0 +1,221 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release'
+        required: true
+        default: ''
+
+permissions:
+  contents: write
+  issues: write
+  packages: write
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+          cache: true
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Run linters
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+
+  build:
+    name: Build
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux builds
+          - os: linux
+            arch: amd64
+            ext: ""
+          - os: linux
+            arch: arm64
+            ext: ""
+          - os: linux
+            arch: 386
+            ext: ""
+          # macOS builds
+          - os: darwin
+            arch: amd64
+            ext: ""
+          - os: darwin
+            arch: arm64
+            ext: ""
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+          cache: true
+
+      - name: Get version
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build binaries
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p build/
+          build_time=$(date -u '+%Y-%m-%d_%H:%M:%S')
+          ldflags="-s -w \
+            -X github.com/haiyon/wameter/internal/version.Version=${{ env.VERSION }} \
+            -X github.com/haiyon/wameter/internal/version.BuildDate=${build_time} \
+            -X github.com/haiyon/wameter/internal/version.GitCommit=${GITHUB_SHA::8} \
+            -X github.com/haiyon/wameter/internal/version.GoVersion=$(go version | cut -d' ' -f3) \
+            -X github.com/haiyon/wameter/internal/version.Platform=${GOOS}/${GOARCH}"
+
+          go build -trimpath -ldflags "${ldflags}" \
+            -o "build/wameter-server-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}" \
+            ./cmd/server
+
+          go build -trimpath -ldflags "${ldflags}" \
+            -o "build/wameter-agent-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}" \
+            ./cmd/agent
+
+      - name: Prepare release assets
+        working-directory: build
+        run: |
+          # Create archive for each platform
+          for file in wameter-*; do
+            tar czf "${file}.tar.gz" "${file}" \
+              ../README.md ../LICENSE ../examples/
+            rm "${file}"
+          done
+
+          # Generate checksums
+          sha256sum *.tar.gz > sha256sums.txt
+
+          # Create version file
+          echo "${{ env.VERSION }}" > version.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wameter-${{ matrix.os }}-${{ matrix.arch }}
+          path: build/
+          retention-days: 1
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate changelog
+        id: changelog
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: releases } = await github.rest.repos.listReleases({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 1
+            });
+
+            const { data: commits } = await github.rest.repos.compareCommits({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              base: releases[0]?.tag_name || 'HEAD~10',
+              head: 'HEAD'
+            });
+
+            const changelog = commits.commits
+              .map(commit => `- ${commit.commit.message.split('\n')[0]}`)
+              .join('\n');
+
+            return changelog;
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ env.VERSION }}
+          files: |
+            artifacts/*.tar.gz
+            artifacts/sha256sums.txt
+            artifacts/version.txt
+          body: |
+            ## Changes
+            ${{ steps.changelog.outputs.result }}
+
+            ## Installation
+            Download the appropriate version for your platform and architecture.
+
+            ```bash
+            # Verify checksum
+            sha256sum --check sha256sums.txt
+
+            # Extract archive
+            tar xzf wameter-*.tar.gz
+            ```
+
+            See [README.md](README.md) for detailed installation instructions.
+          draft: true
+          prerelease: ${{ contains(env.VERSION, '-rc') || contains(env.VERSION, '-beta') || contains(env.VERSION, '-alpha') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  cleanup:
+    name: Cleanup
+    needs: release
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete artifacts
+        uses: geekyeggo/delete-artifact@v4
+        with:
+          name: |
+            wameter-*

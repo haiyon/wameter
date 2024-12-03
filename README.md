@@ -1,113 +1,110 @@
 # Wameter
 
-Wameter is a cross-platform IP monitoring tool that tracks internal and external IP address changes and sends notifications through multiple channels. It supports Linux, macOS, and Windows.
+Wameter is a cross-platform network monitoring tool for tracking interface metrics and IP changes with multi-channel
+notifications. It uses a server-agent architecture and supports multiple storage backends.
 
 ## Features
 
-- **Cross-platform compatibility**: Linux, macOS, Windows
-- **Network interface monitoring**:
-  - Multi-interface support
-  - Virtual interface monitoring (optional)
-  - Real-time statistics collection
-  - Status monitoring and error tracking
-- **External IP tracking**: Uses multiple providers
-- **Notifications**:
-  - Email notifications
-  - Telegram notifications
-- **Customizable settings**:
-  - Check intervals
-  - Interface filtering
-  - Notification content
-- **Low resource usage**
+- Network interface monitoring (physical and virtual)
+- Real-time network statistics and external IP tracking
+- Multiple notification channels (Email, Telegram, Webhook, Slack)
+- Flexible storage backends (SQLite, MySQL, PostgreSQL)
+- Cross-platform support (Linux, macOS)
+- RESTful API
 
-## Quick Installation
+## Quick Start
 
-### Steps
+### Installation
 
-1. **Download or build the binary**:
-   Build a binary for your platform with:
-
-   ```bash
-   go build -o wameter
-   ```
-
-2. **Set up configuration**:
-   Create the configuration file directory:
-
-   ```bash
-   # Linux/macOS
-   sudo mkdir -p /etc/wameter
-   sudo cp config.example.json /etc/wameter/config.json
-
-   # Windows (Run PowerShell as Administrator)
-   New-Item -Path "C:\ProgramData\wameter" -ItemType Directory
-   Copy-Item config.example.json C:\ProgramData\wameter\config.json
-   ```
-
-3. **Start the service**:
-
-- On Linux/macOS:
-
-  ```bash
-  ./wameter -config /etc/wameter/config.json
-  ```
-
-- On Windows:
-
-  ```powershell
-  .\wameter.exe -config C:\ProgramData\wameter\config.json
-  ```
-
-## Configuration
-
-Configuration file example: `config.example.json`
-
-Key options:
-
-- `include_virtual`: Enable/disable monitoring of virtual interfaces
-- `exclude_interfaces`: List of interface names or patterns to exclude
-- `interface_types`: Types of interfaces to monitor
-- `stat_collection`: Options for statistics collection
-
-## Notifications
-
-- **Email**: Sends detailed updates with per-interface statistics
-- **Telegram**: Provides real-time updates on IP changes, bandwidth, and errors
-
-## Logging
-
-Default log file locations:
-
-- **Linux/macOS**: `/var/log/wameter/monitor.log`
-- **Windows**: `C:\ProgramData\wameter\logs\monitor.log`
-
-## Building
-
-To compile the binary for your current platform:
+Using installation script:
 
 ```bash
-go build -o wameter
+# Install server
+./scripts/install.sh -c server
+
+# Install agent
+./scripts/install.sh -c agent
 ```
 
-To cross-compile:
+### Configuration
 
-- For Linux:
+Server configuration (`/etc/wameter/server.yaml`):
 
-  ```bash
-  GOOS=linux GOARCH=amd64 go build -o wameter-linux
-  ```
+```yaml
+server:
+  address: ":8080"
 
-- For macOS:
+storage:
+  driver: "sqlite"
+  dsn: "/var/lib/wameter/data.db"
 
-  ```bash
-  GOOS=darwin GOARCH=amd64 go build -o wameter-macos
-  ```
+notify:
+  email:
+    enabled: true
+    smtp_server: "smtp.example.com"
+  telegram:
+    enabled: true
+    bot_token: "your-bot-token"
+```
 
-- For Windows:
+Agent configuration (`/etc/wameter/agent.yaml`):
 
-  ```bash
-  GOOS=windows GOARCH=amd64 go build -o wameter.exe
-  ```
+```yaml
+agent:
+  id: "agent-1"
+  server:
+    address: "http://localhost:8080"
+
+collector:
+  network:
+    enabled: true
+    interfaces: ["eth0"]
+    check_external_ip: true
+```
+
+### Running
+
+Using systemd (Linux):
+
+```bash
+# Server
+sudo systemctl enable wameter-server
+sudo systemctl start wameter-server
+
+# Agent
+sudo systemctl enable wameter-agent
+sudo systemctl start wameter-agent
+```
+
+Using command line:
+
+```bash
+wameter-server -config /etc/wameter/server.yaml
+wameter-agent -config /etc/wameter/agent.yaml
+```
+
+## API Endpoints
+
+- `GET /api/v1/metrics` - Get monitoring metrics
+- `GET /api/v1/agents` - List agents
+- `GET /api/v1/agents/:id` - Get agent details
+- `POST /api/v1/agents/:id/command` - Send command to agent
+
+Full API documentation is available at the `/docs` endpoint.
+
+## Maintenance
+
+Update components:
+
+```bash
+./scripts/update.sh -c [server|agent]
+```
+
+Uninstall components:
+
+```bash
+./scripts/uninstall.sh -c [server|agent]
+```
 
 ## License
 

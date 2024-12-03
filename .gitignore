@@ -1,13 +1,20 @@
 .idea/
 .vscode/
+
 .DS_Store
+
 logs/*
+
 /.VSCodeCounter/
+
 build/
 dist/
-
-wameter
 
 # config
 !config.example.json
 config.json
+/agent.yaml
+/server.yaml
+
+# storage
+/data.db

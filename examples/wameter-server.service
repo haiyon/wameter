@@ -1,0 +1,28 @@
+[Unit]
+Description=Wameter Server
+After=network.target
+Documentation=https://github.com/haiyon/wameter
+
+[Service]
+Type=simple
+User=root
+ExecStart=/opt/wameter/bin/server -config /etc/wameter/server.yaml
+Restart=always
+RestartSec=10
+TimeoutStartSec=60
+TimeoutStopSec=60
+
+# Resource limits
+LimitNOFILE=8192
+MemoryMax=512M
+TasksMax=200
+
+# Security options
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/log/wameter /var/lib/wameter/db
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
