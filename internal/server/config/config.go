@@ -279,6 +279,10 @@ func validateConfig(config *Config) error {
 
 // Validate storage configuration
 func validateStorageConfig(config *storage.Config) error {
+	if config.MaxConnections < 1 {
+		return fmt.Errorf("storage.max_connections must be positive")
+	}
+
 	switch config.Driver {
 	case "sqlite", "mysql", "postgres":
 		if config.DSN == "" {

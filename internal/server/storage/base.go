@@ -212,32 +212,33 @@ type TxFn func(*sql.Tx) error
 
 // WithTransaction executes operations in a transaction
 func (s *BaseStorage) WithTransaction(ctx context.Context, fn TxFn) error {
-	tx, err := s.db.BeginTx(ctx, &sql.TxOptions{
-		Isolation: sql.LevelSerializable,
-	})
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 
 	defer func() {
 		if p := recover(); p != nil {
-			tx.Rollback()
+			if rbErr := tx.Rollback(); rbErr != nil {
+				s.logger.Error("rollback failed during panic",
+					zap.Error(rbErr),
+					zap.Any("panic", p))
+			}
 			panic(p)
 		}
 	}()
 
 	if err := fn(tx); err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
+			s.logger.Error("rollback failed",
+				zap.Error(rbErr),
+				zap.Error(err))
 			return fmt.Errorf("rollback failed: %v (original error: %w)", rbErr, err)
 		}
 		return err
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit transaction: %w", err)
-	}
-
-	return nil
+	return tx.Commit()
 }
 
 // ExecContext executes a query
