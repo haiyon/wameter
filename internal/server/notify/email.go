@@ -8,9 +8,10 @@ import (
 	"net/smtp"
 	"time"
 
-	"github.com/haiyon/wameter/internal/server/config"
-	"github.com/haiyon/wameter/internal/types"
-	"github.com/haiyon/wameter/internal/utils"
+	"wameter/internal/server/config"
+	"wameter/internal/types"
+	"wameter/internal/utils"
+
 	"go.uber.org/zap"
 )
 

@@ -7,8 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/haiyon/wameter/internal/agent/config"
-	commonCfg "github.com/haiyon/wameter/internal/config"
+	"wameter/internal/agent/config"
+	commonCfg "wameter/internal/config"
+
 	"go.uber.org/zap"
 )
 

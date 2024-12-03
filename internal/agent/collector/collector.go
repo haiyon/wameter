@@ -6,8 +6,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/haiyon/wameter/internal/agent/config"
-	"github.com/haiyon/wameter/internal/types"
+	"wameter/internal/agent/config"
+	"wameter/internal/types"
+
 	"go.uber.org/zap"
 )
 

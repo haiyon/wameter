@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/haiyon/wameter/internal/server/storage"
+	"wameter/internal/server/storage"
+
 	"github.com/spf13/viper"
 )
 

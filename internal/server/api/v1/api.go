@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"time"
 
+	"wameter/internal/server/api/response"
+	"wameter/internal/server/service"
+	"wameter/internal/types"
+
 	"github.com/gin-gonic/gin"
-	"github.com/haiyon/wameter/internal/server/api/response"
-	"github.com/haiyon/wameter/internal/server/service"
-	"github.com/haiyon/wameter/internal/types"
 	"go.uber.org/zap"
 )
 

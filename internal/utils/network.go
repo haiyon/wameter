@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/haiyon/wameter/internal/types"
+	"wameter/internal/types"
 )
 
 // IsValidIP checks if a string is a valid IP address, optionally checking for IPv6

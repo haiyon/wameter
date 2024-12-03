@@ -7,10 +7,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/haiyon/wameter/internal/server/config"
-	"github.com/haiyon/wameter/internal/server/notify"
-	"github.com/haiyon/wameter/internal/server/storage"
-	"github.com/haiyon/wameter/internal/types"
+	"wameter/internal/server/config"
+	"wameter/internal/server/notify"
+	"wameter/internal/server/storage"
+	"wameter/internal/types"
+
 	"go.uber.org/zap"
 )
 

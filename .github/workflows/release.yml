@@ -104,11 +104,11 @@ jobs:
           mkdir -p build/
           build_time=$(date -u '+%Y-%m-%d_%H:%M:%S')
           ldflags="-s -w \
-            -X github.com/haiyon/wameter/internal/version.Version=${{ env.VERSION }} \
-            -X github.com/haiyon/wameter/internal/version.BuildDate=${build_time} \
-            -X github.com/haiyon/wameter/internal/version.GitCommit=${GITHUB_SHA::8} \
-            -X github.com/haiyon/wameter/internal/version.GoVersion=$(go version | cut -d' ' -f3) \
-            -X github.com/haiyon/wameter/internal/version.Platform=${GOOS}/${GOARCH}"
+            -X wameter/internal/version.Version=${{ env.VERSION }} \
+            -X wameter/internal/version.BuildDate=${build_time} \
+            -X wameter/internal/version.GitCommit=${GITHUB_SHA::8} \
+            -X wameter/internal/version.GoVersion=$(go version | cut -d' ' -f3) \
+            -X wameter/internal/version.Platform=${GOOS}/${GOARCH}"
 
           go build -trimpath -ldflags "${ldflags}" \
             -o "build/wameter-server-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}" \

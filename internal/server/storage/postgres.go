@@ -9,7 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/haiyon/wameter/internal/types"
+	"wameter/internal/types"
+
 	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 	"go.uber.org/zap"

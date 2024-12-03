@@ -8,10 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"wameter/internal/server/api/response"
+	"wameter/internal/server/config"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/haiyon/wameter/internal/server/api/response"
-	"github.com/haiyon/wameter/internal/server/config"
 	"go.uber.org/zap"
 )
 

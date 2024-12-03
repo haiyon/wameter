@@ -9,8 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"wameter/internal/types"
+
 	"github.com/go-sql-driver/mysql"
-	"github.com/haiyon/wameter/internal/types"
 	"go.uber.org/zap"
 )
 

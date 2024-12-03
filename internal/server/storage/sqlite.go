@@ -9,7 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/haiyon/wameter/internal/types"
+	"wameter/internal/types"
+
 	_ "github.com/mattn/go-sqlite3"
 	"go.uber.org/zap"
 )

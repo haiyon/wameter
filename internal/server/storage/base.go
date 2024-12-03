@@ -8,7 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/haiyon/wameter/internal/types"
+	"wameter/internal/types"
+
 	"go.uber.org/zap"
 )
 

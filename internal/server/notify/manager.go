@@ -3,8 +3,9 @@ package notify
 import (
 	"fmt"
 
-	"github.com/haiyon/wameter/internal/server/config"
-	"github.com/haiyon/wameter/internal/types"
+	"wameter/internal/server/config"
+	"wameter/internal/types"
+
 	"go.uber.org/zap"
 )
 

@@ -4,11 +4,12 @@ import (
 	"net/http"
 	"time"
 
+	"wameter/internal/server/api/middleware"
+	av1 "wameter/internal/server/api/v1"
+	"wameter/internal/server/config"
+	"wameter/internal/server/service"
+
 	"github.com/gin-gonic/gin"
-	"github.com/haiyon/wameter/internal/server/api/middleware"
-	v1 "github.com/haiyon/wameter/internal/server/api/v1"
-	"github.com/haiyon/wameter/internal/server/config"
-	"github.com/haiyon/wameter/internal/server/service"
 	"go.uber.org/zap"
 )
 
@@ -76,7 +77,7 @@ func (r *Router) setupMiddleware() {
 
 // setupAPIV1 configures v1 API routes
 func (r *Router) setupAPIV1(svc *service.Service) {
-	api := v1.NewAPI(svc, r.logger)
+	api := av1.NewAPI(svc, r.logger)
 
 	// Create v1 route group
 	v1Router := r.engine.Group("/api/v1")

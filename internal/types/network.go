@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/haiyon/wameter/internal/validator"
+	"wameter/internal/validator"
 )
 
 var validate = validator.New()

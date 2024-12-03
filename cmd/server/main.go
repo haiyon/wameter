@@ -11,11 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/haiyon/wameter/internal/server/api"
-	"github.com/haiyon/wameter/internal/server/config"
-	"github.com/haiyon/wameter/internal/server/service"
-	"github.com/haiyon/wameter/internal/server/storage"
-	"github.com/haiyon/wameter/internal/version"
+	"wameter/internal/server/api"
+	"wameter/internal/server/config"
+	"wameter/internal/server/service"
+	"wameter/internal/server/storage"
+	"wameter/internal/version"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
