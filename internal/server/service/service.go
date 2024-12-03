@@ -113,7 +113,38 @@ func (s *Service) GetLatestMetrics(ctx context.Context, agentID string) (*types.
 
 // GetAgents retrieves all agents
 func (s *Service) GetAgents(ctx context.Context) ([]*types.AgentInfo, error) {
-	return s.storage.GetAgents(ctx)
+	// Add timeout if not already set in context
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+	}
+
+	// Use synchronization to prevent concurrent map access
+	s.agentsMu.RLock()
+	agents := make([]*types.AgentInfo, 0, len(s.agents))
+	for _, agent := range s.agents {
+		// Check context cancellation during iteration
+		select {
+		case <-ctx.Done():
+			s.agentsMu.RUnlock()
+			return nil, ctx.Err()
+		default:
+			agentCopy := *agent // Create a copy to prevent data races
+			agents = append(agents, &agentCopy)
+		}
+	}
+	s.agentsMu.RUnlock()
+
+	if len(agents) == 0 {
+		// Consider whether empty result is an error in your case
+		return agents, nil
+	}
+
+	// Add optional caching if needed
+	// s.cacheAgents(agents)
+
+	return agents, nil
 }
 
 // GetAgent retrieves an agent

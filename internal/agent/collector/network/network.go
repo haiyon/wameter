@@ -27,6 +27,7 @@ type networkCollector struct {
 	stopChan  chan struct{}
 	lastState *types.NetworkState
 	mu        sync.RWMutex
+	client    *http.Client
 }
 
 // NewCollector creates a new network collector
@@ -36,6 +37,16 @@ func NewCollector(cfg *config.NetworkConfig, logger *zap.Logger) *networkCollect
 		logger:   logger,
 		stopChan: make(chan struct{}),
 		stats:    newStatsCollector(cfg, logger),
+		client: &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				IdleConnTimeout:     90 * time.Second,
+				DisableCompression:  true,
+				DisableKeepAlives:   false,
+				MaxIdleConnsPerHost: 10,
+			},
+		},
 	}
 }
 
@@ -62,6 +73,12 @@ func (c *networkCollector) Start(ctx context.Context) error {
 // Stop stops the collector
 func (c *networkCollector) Stop() error {
 	close(c.stopChan)
+
+	// Cleanup HTTP client resources
+	if transport, ok := c.client.Transport.(*http.Transport); ok {
+		transport.CloseIdleConnections()
+	}
+
 	return c.stats.Stop()
 }
 
@@ -216,21 +233,25 @@ func (c *networkCollector) getExternalIP(ctx context.Context) (string, error) {
 		err      error
 	}
 
-	// Create channel for results
+	// Create buffered channel to prevent goroutine leaks
 	results := make(chan result, len(c.config.ExternalProviders))
+	deadline := time.After(10 * time.Second)
 
 	// Query all providers concurrently
 	for _, provider := range c.config.ExternalProviders {
 		go func(p string) {
 			ip, err := c.queryExternalProvider(ctx, p)
-			results <- result{p, ip, err}
+			select {
+			case results <- result{p, ip, err}:
+			case <-ctx.Done():
+			case <-deadline:
+			}
 		}(provider)
 	}
 
-	// Collect results with timeout
-	timeout := time.After(10 * time.Second)
-	var lastErr error
+	// Use map to track IP consensus
 	ips := make(map[string]int)
+	var lastErr error
 
 	for i := 0; i < len(c.config.ExternalProviders); i++ {
 		select {
@@ -240,18 +261,18 @@ func (c *networkCollector) getExternalIP(ctx context.Context) (string, error) {
 				continue
 			}
 			ips[r.ip]++
-			// If we have a consensus among multiple providers, return that IP
 			if count := ips[r.ip]; count >= 2 {
 				return r.ip, nil
 			}
-		case <-timeout:
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case <-deadline:
 			return "", fmt.Errorf("timeout waiting for external IP providers")
 		}
 	}
 
-	// If we have at least one successful result
+	// Return most reported IP if no consensus
 	if len(ips) > 0 {
-		// Return the most reported IP
 		var mostReportedIP string
 		maxCount := 0
 		for ip, count := range ips {

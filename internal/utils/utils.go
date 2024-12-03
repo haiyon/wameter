@@ -2,8 +2,10 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 	"sort"
+	"strconv"
 	"time"
 )
 
@@ -73,4 +75,30 @@ func StringSlicesEqual(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// ParseTime parses time string
+func ParseTime(timeStr string) (time.Time, error) {
+	formats := []string{
+		"2006-01-02T15:04:05Z07:00", // RFC3339
+		"2006-01-02T15:04:05Z",      // UTC
+		"2006-01-02 15:04:05",       // DateTime
+		"2006-01-02",                // Date
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, timeStr); err == nil {
+			return t, nil
+		}
+	}
+
+	if unixTime, err := strconv.ParseInt(timeStr, 10, 64); err == nil {
+		// Unix timestamp
+		if unixTime > 1e10 { // Unix timestamp in milliseconds
+			return time.UnixMilli(unixTime), nil
+		}
+		return time.Unix(unixTime, 0), nil
+	}
+
+	return time.Time{}, fmt.Errorf("unsupported time format: %s", timeStr)
 }

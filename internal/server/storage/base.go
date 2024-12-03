@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"time"
@@ -69,26 +70,28 @@ func NewBaseStorage(driver, dsn string, opts Options, logger *zap.Logger) (*Base
 
 // RegisterAgent registers a new agent or updates existing one
 func (s *BaseStorage) RegisterAgent(ctx context.Context, agent *types.AgentInfo) error {
-	query := `
-        INSERT INTO agents (id, hostname, version, status, last_seen, registered_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT (id) DO UPDATE SET
-            hostname = EXCLUDED.hostname,
-            version = EXCLUDED.version,
-            status = EXCLUDED.status,
-            last_seen = EXCLUDED.last_seen,
-            updated_at = EXCLUDED.updated_at`
+	return s.WithTransaction(ctx, func(tx *sql.Tx) error {
+		query := `
+            INSERT INTO agents (id, hostname, version, status, last_seen, registered_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT (id) DO UPDATE SET
+                hostname = EXCLUDED.hostname,
+                version = EXCLUDED.version,
+                status = EXCLUDED.status,
+                last_seen = EXCLUDED.last_seen,
+                updated_at = EXCLUDED.updated_at`
 
-	_, err := s.ExecContext(ctx, query,
-		agent.ID,
-		agent.Hostname,
-		agent.Version,
-		agent.Status,
-		agent.LastSeen,
-		agent.RegisteredAt,
-		agent.UpdatedAt)
+		_, err := tx.ExecContext(ctx, query,
+			agent.ID,
+			agent.Hostname,
+			agent.Version,
+			agent.Status,
+			agent.LastSeen,
+			agent.RegisteredAt,
+			agent.UpdatedAt)
 
-	return err
+		return err
+	})
 }
 
 // UpdateAgentStatus updates agent status
@@ -120,16 +123,31 @@ func (s *BaseStorage) UpdateAgentStatus(ctx context.Context, agentID string, sta
 func (s *BaseStorage) GetAgents(ctx context.Context) ([]*types.AgentInfo, error) {
 	query := `
         SELECT id, hostname, version, status, last_seen, registered_at, updated_at
-        FROM agents`
+        FROM agents
+        ORDER BY hostname`
 
+	// Execute query with timeout
 	rows, err := s.QueryContext(ctx, query)
 	if err != nil {
-		return nil, err
+		if errors.Is(err, context.Canceled) {
+			return nil, err
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("query failed: %w", err)
 	}
 	defer rows.Close()
 
 	var agents []*types.AgentInfo
 	for rows.Next() {
+		// Check context cancellation during iteration
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
 		agent := &types.AgentInfo{}
 		err := rows.Scan(
 			&agent.ID,
@@ -141,51 +159,52 @@ func (s *BaseStorage) GetAgents(ctx context.Context) ([]*types.AgentInfo, error)
 			&agent.UpdatedAt)
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scan failed: %w", err)
 		}
 		agents = append(agents, agent)
 	}
 
-	return agents, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration failed: %w", err)
+	}
+
+	return agents, nil
 }
 
 // BatchSaveMetrics saves multiple metrics in a single transaction
 func (s *BaseStorage) BatchSaveMetrics(ctx context.Context, metrics []*types.MetricsData) error {
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+	if len(metrics) == 0 {
+		return nil
 	}
-	defer tx.Rollback()
 
-	query := `
-        INSERT INTO metrics (agent_id, timestamp, collected_at, reported_at, data)
-        VALUES (?, ?, ?, ?, ?)`
-
-	stmt, err := tx.PrepareContext(ctx, query)
-	if err != nil {
-		return err
-	}
-	defer stmt.Close()
-
-	for _, m := range metrics {
-		jsonData, err := json.Marshal(m)
+	return s.WithTransaction(ctx, func(tx *sql.Tx) error {
+		stmt, err := tx.PrepareContext(ctx, `
+            INSERT INTO metrics (agent_id, timestamp, collected_at, reported_at, data)
+            VALUES (?, ?, ?, ?, ?)`)
 		if err != nil {
-			return err
+			return fmt.Errorf("prepare statement: %w", err)
+		}
+		defer stmt.Close()
+
+		for _, m := range metrics {
+			jsonData, err := json.Marshal(m)
+			if err != nil {
+				return fmt.Errorf("marshal metrics data: %w", err)
+			}
+
+			_, err = stmt.ExecContext(ctx,
+				m.AgentID,
+				m.Timestamp,
+				m.CollectedAt,
+				m.ReportedAt,
+				jsonData)
+			if err != nil {
+				return fmt.Errorf("exec statement: %w", err)
+			}
 		}
 
-		_, err = stmt.ExecContext(ctx,
-			m.AgentID,
-			m.Timestamp,
-			m.CollectedAt,
-			m.ReportedAt,
-			jsonData)
-
-		if err != nil {
-			return err
-		}
-	}
-
-	return tx.Commit()
+		return nil
+	})
 }
 
 // TxFn represents a transaction function
@@ -310,4 +329,60 @@ func scanMetrics(rows *sql.Rows, data *types.MetricsData) error {
 		return err
 	}
 	return json.Unmarshal(jsonData, data)
+}
+
+// GetMetrics returns metrics
+func (s *BaseStorage) GetMetrics(ctx context.Context, query *MetricsQuery, opts QueryOptions) ([]*types.MetricsData, error) {
+	if opts.Timeout == 0 {
+		opts.Timeout = 30 * time.Second
+	}
+
+	queryCtx, cancel := context.WithTimeout(ctx, opts.Timeout)
+	defer cancel()
+
+	qb := &QueryBuilder{}
+	qb.Reset()
+
+	baseQuery := `
+        SELECT data FROM metrics
+        WHERE timestamp BETWEEN ? AND ?`
+
+	qb.args = append(qb.args, query.StartTime, query.EndTime)
+
+	if len(query.AgentIDs) > 0 {
+		qb.Where("agent_id IN (?)", query.AgentIDs)
+	}
+
+	if query.OrderBy != "" {
+		qb.OrderBy(query.OrderBy, query.Order)
+	}
+
+	if query.Limit > 0 {
+		qb.Limit(query.Limit)
+	}
+
+	rows, err := s.QueryContext(queryCtx, baseQuery+qb.String(), qb.Args()...)
+	if err != nil {
+		return nil, fmt.Errorf("query metrics: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*types.MetricsData
+	for rows.Next() {
+		if err := queryCtx.Err(); err != nil {
+			return nil, fmt.Errorf("context canceled: %w", err)
+		}
+
+		var data types.MetricsData
+		if err := scanMetrics(rows, &data); err != nil {
+			return nil, fmt.Errorf("scan metrics: %w", err)
+		}
+		results = append(results, &data)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration: %w", err)
+	}
+
+	return results, nil
 }
