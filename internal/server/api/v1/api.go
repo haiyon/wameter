@@ -65,14 +65,28 @@ func (api *API) saveMetrics(c *gin.Context) {
 		api.logger.Error("Invalid metrics data",
 			zap.Error(err),
 			zap.String("client_ip", c.ClientIP()))
-		resp.BadRequest(errors.New("invalid metrics data format"))
+		resp.BadRequest(fmt.Errorf("invalid metrics data format: %v", err))
 		return
 	}
 
 	// Basic validation
-	if data.AgentID == "" || data.Hostname == "" {
-		resp.BadRequest(errors.New("agent_id and hostname are required"))
+	if data.AgentID == "" {
+		resp.BadRequest(errors.New("agent_id is required"))
 		return
+	}
+	if data.Hostname == "" {
+		resp.BadRequest(errors.New("hostname is required"))
+		return
+	}
+	if data.Metrics.Network != nil {
+		if data.Metrics.Network.AgentID == "" {
+			resp.BadRequest(errors.New("network.agent_id is required"))
+			return
+		}
+		if data.Metrics.Network.Hostname == "" {
+			resp.BadRequest(errors.New("network.hostname is required"))
+			return
+		}
 	}
 
 	// Set reported time
@@ -157,11 +171,11 @@ func (api *API) getMetrics(c *gin.Context) {
 	})
 
 	if err != nil {
-		if err == context.Canceled {
+		if errors.Is(err, context.Canceled) {
 			api.logger.Info("Client canceled metrics request")
 			return
 		}
-		if err == context.DeadlineExceeded {
+		if errors.Is(err, context.DeadlineExceeded) {
 			resp.Error(http.StatusGatewayTimeout, errors.New("request timeout"))
 			return
 		}

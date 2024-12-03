@@ -22,6 +22,7 @@ import (
 // networkCollector represents a network collector
 type networkCollector struct {
 	config    *config.NetworkConfig
+	agentID   string
 	logger    *zap.Logger
 	stats     *statsCollector
 	stopChan  chan struct{}
@@ -31,9 +32,10 @@ type networkCollector struct {
 }
 
 // NewCollector creates a new network collector
-func NewCollector(cfg *config.NetworkConfig, logger *zap.Logger) *networkCollector {
+func NewCollector(cfg *config.NetworkConfig, agentID string, logger *zap.Logger) *networkCollector {
 	return &networkCollector{
 		config:   cfg,
+		agentID:  agentID,
 		logger:   logger,
 		stopChan: make(chan struct{}),
 		stats:    newStatsCollector(cfg, logger),
@@ -94,10 +96,12 @@ func (c *networkCollector) Collect(ctx context.Context) (*types.MetricsData, err
 	}
 
 	state := &types.NetworkState{
+		AgentID:     c.agentID,
 		Hostname:    hostname,
 		Timestamp:   time.Now(),
 		Interfaces:  make(map[string]*types.InterfaceInfo),
 		CollectedAt: time.Now(),
+		ReportedAt:  time.Now(),
 	}
 
 	// Collect interface information
@@ -127,9 +131,11 @@ func (c *networkCollector) Collect(ctx context.Context) (*types.MetricsData, err
 	c.mu.Unlock()
 
 	return &types.MetricsData{
-		Timestamp:   state.Timestamp,
+		AgentID:     c.agentID,
 		Hostname:    hostname,
+		Timestamp:   state.Timestamp,
 		CollectedAt: state.CollectedAt,
+		ReportedAt:  state.ReportedAt,
 		Metrics: struct {
 			Network *types.NetworkState `json:"network,omitempty"`
 		}{

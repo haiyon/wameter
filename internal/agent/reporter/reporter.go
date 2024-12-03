@@ -6,7 +6,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -104,9 +106,31 @@ func (r *Reporter) processLoop(ctx context.Context) {
 
 // sendData sends metrics data
 func (r *Reporter) sendData(ctx context.Context, data *types.MetricsData) error {
-	// Add agent metadata
+	// Set agent ID
 	data.AgentID = r.config.Agent.ID
+
+	// Set hostname if not set
+	if data.Hostname == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			return fmt.Errorf("failed to get hostname: %w", err)
+		}
+		data.Hostname = hostname
+	}
+
+	// Set reported at
 	data.ReportedAt = time.Now()
+
+	if data.Metrics.Network != nil {
+		data.Metrics.Network.AgentID = r.config.Agent.ID
+		data.Metrics.Network.Hostname = data.Hostname
+		data.Metrics.Network.ReportedAt = data.ReportedAt
+	}
+
+	r.logger.Debug("Sending metrics data",
+		zap.String("agent_id", data.AgentID),
+		zap.String("hostname", data.Hostname),
+		zap.Time("timestamp", data.Timestamp))
 
 	// Convert to JSON
 	payload, err := json.Marshal(data)
@@ -132,7 +156,8 @@ func (r *Reporter) sendData(ctx context.Context, data *types.MetricsData) error 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("server returned status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	return nil

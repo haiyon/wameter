@@ -60,7 +60,7 @@ func main() {
 	h := handler.NewHandler(cfg, logger, cm)
 
 	// Register collectors
-	networkCollector := network.NewCollector(&cfg.Collector.Network, logger)
+	networkCollector := network.NewCollector(&cfg.Collector.Network, cfg.Agent.ID, logger)
 	if err := cm.RegisterCollector(networkCollector); err != nil {
 		logger.Fatal("Failed to register network collector", zap.Error(err))
 	}

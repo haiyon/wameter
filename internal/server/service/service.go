@@ -257,44 +257,51 @@ func (s *Service) updateAgentStatus(agentID string, status types.AgentStatus) {
 	s.agentsMu.Lock()
 	defer s.agentsMu.Unlock()
 
+	now := time.Now()
 	agent, exists := s.agents[agentID]
 	if !exists {
-		hostname := "" // Hostname will be updated from metrics
 		agent = &types.AgentInfo{
 			ID:           agentID,
-			Hostname:     hostname,
 			Status:       status,
-			RegisteredAt: time.Now(),
-			LastSeen:     time.Now(),
-			UpdatedAt:    time.Now(),
-			Version:      "unknown", // Version will be updated from metrics
+			RegisteredAt: now,
+			LastSeen:     now,
+			UpdatedAt:    now,
+			Version:      "unknown",
 		}
 		s.agents[agentID] = agent
 
 		// Register agent
-		go func() {
-			if err := s.storage.RegisterAgent(context.Background(), agent); err != nil {
-				s.logger.Error("Failed to register agent",
-					zap.Error(err),
-					zap.String("agent_id", agentID))
+		agentCopy := *agent
+		go func(agent types.AgentInfo) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			if err := s.storage.RegisterAgent(ctx, &agent); err != nil {
+				if !errors.Is(err, types.ErrAgentNotFound) {
+					s.logger.Error("Failed to register agent",
+						zap.Error(err),
+						zap.String("agent_id", agentID))
+				}
 			}
-		}()
+		}(agentCopy)
 	} else {
 		agent.Status = status
-		agent.LastSeen = time.Now()
-		agent.UpdatedAt = time.Now()
-	}
+		agent.LastSeen = now
+		agent.UpdatedAt = now
 
-	// Update storage asynchronously
-	go func() {
-		if err := s.storage.UpdateAgentStatus(context.Background(), agentID, status); err != nil {
-			if !errors.Is(err, types.ErrAgentNotFound) {
+		// Update storage asynchronously
+		agentCopy := *agent
+		go func(agent types.AgentInfo) {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			if err := s.storage.UpdateAgentStatus(ctx, agentID, status); err != nil {
 				s.logger.Error("Failed to update agent status",
 					zap.Error(err),
 					zap.String("agent_id", agentID))
 			}
-		}
-	}()
+		}(agentCopy)
+	}
 }
 
 // processMetricsNotifications processes metrics notifications

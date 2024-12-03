@@ -127,6 +127,10 @@ func LoadConfig(path string) (*Config, error) {
 
 // setDefaults sets default values if not specified
 func setDefaults(config *Config) {
+	if config.Agent.Port == 0 {
+		config.Agent.Port = 8081
+	}
+
 	if config.Collector.Interval == 0 {
 		config.Collector.Interval = 60 * time.Second
 	}
@@ -162,6 +166,14 @@ func setDefaults(config *Config) {
 
 // validateConfig validates the configuration
 func validateConfig(config *Config) error {
+	if config.Agent.ID == "" {
+		return fmt.Errorf("agent.id is required")
+	}
+
+	if config.Agent.Server.Address == "" {
+		return fmt.Errorf("server address is required")
+	}
+
 	if config.Agent.Server.Address == "" {
 		return fmt.Errorf("server address is required")
 	}
