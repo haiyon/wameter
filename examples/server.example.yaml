@@ -18,7 +18,11 @@ server:
 # Storage configuration
 storage:
   driver: "sqlite"  # sqlite, mysql, postgres
-  dsn: "/var/lib/wameter/data.db" # path/connection string
+  # DSN can be a file path/connection string, e.g.
+  # SQLite: "/var/lib/wameter/data.db"
+  # MySQL: "wameter:secret@tcp(127.0.0.1:3306)/wameter?charset=utf8mb4&parseTime=True&loc=Local"
+  # PostgreSQL: "host=localhost user=wameter password=secret dbname=wameter sslmode=disable"
+  dsn: "/var/lib/wameter/data.db"
   max_connections: 25
   max_idle_conns: 5
   conn_max_lifetime: 1h
