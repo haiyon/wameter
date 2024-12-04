@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sync/atomic"
 	"time"
+	"wameter/internal/utils"
 
 	"wameter/internal/types"
 
@@ -28,11 +29,13 @@ type Options struct {
 
 // BaseStorage is the base implementation of the Storage interface
 type BaseStorage struct {
+	driver    string
 	db        *sql.DB
 	opts      Options
 	logger    *zap.Logger
 	metrics   *Metrics
 	pruneStop chan struct{}
+	replacer  func(string) string
 }
 
 // NewBaseStorage creates new BaseStorage
@@ -61,6 +64,7 @@ func NewBaseStorage(driver, dsn string, opts Options, logger *zap.Logger) (*Base
 	}
 
 	return &BaseStorage{
+		driver:  driver,
 		db:      db,
 		opts:    opts,
 		logger:  logger,
@@ -72,14 +76,27 @@ func NewBaseStorage(driver, dsn string, opts Options, logger *zap.Logger) (*Base
 func (s *BaseStorage) RegisterAgent(ctx context.Context, agent *types.AgentInfo) error {
 	return s.WithTransaction(ctx, func(tx *sql.Tx) error {
 		query := `
-            INSERT INTO agents (id, hostname, version, status, last_seen, registered_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT (id) DO UPDATE SET
-                hostname = EXCLUDED.hostname,
-                version = EXCLUDED.version,
-                status = EXCLUDED.status,
-                last_seen = EXCLUDED.last_seen,
-                updated_at = EXCLUDED.updated_at`
+							INSERT INTO agents (id, hostname, version, status, last_seen, registered_at, updated_at)
+							VALUES (?, ?, ?, ?, ?, ?, ?)`
+
+		if s.driver == "postgres" {
+			query += `ON CONFLICT (id) DO UPDATE SET
+            hostname = EXCLUDED.hostname,
+            version = EXCLUDED.version,
+            status = EXCLUDED.status,
+            last_seen = EXCLUDED.last_seen,
+            updated_at = EXCLUDED.updated_at`
+			query = utils.ConvertPlaceholders(query)
+		}
+
+		if s.driver == "mysql" {
+			query += `ON DUPLICATE KEY UPDATE
+            hostname = VALUES(hostname),
+            version = VALUES(version),
+            status = VALUES(status),
+            last_seen = VALUES(last_seen),
+            updated_at = VALUES(updated_at)`
+		}
 
 		_, err := tx.ExecContext(ctx, query,
 			agent.ID,
@@ -178,9 +195,15 @@ func (s *BaseStorage) BatchSaveMetrics(ctx context.Context, metrics []*types.Met
 	}
 
 	return s.WithTransaction(ctx, func(tx *sql.Tx) error {
-		stmt, err := tx.PrepareContext(ctx, `
+		query := `
             INSERT INTO metrics (agent_id, timestamp, collected_at, reported_at, data)
-            VALUES (?, ?, ?, ?, ?)`)
+            VALUES (?, ?, ?, ?, ?)`
+
+		if s.driver == "postgres" {
+			query = utils.ConvertPlaceholders(query)
+		}
+
+		stmt, err := tx.PrepareContext(ctx, query)
 		if err != nil {
 			return fmt.Errorf("prepare statement: %w", err)
 		}
@@ -247,6 +270,10 @@ func (s *BaseStorage) ExecContext(ctx context.Context, query string, args ...any
 	ctx, cancel := context.WithTimeout(ctx, s.opts.QueryTimeout)
 	defer cancel()
 
+	if s.driver == "postgres" {
+		query = utils.ConvertPlaceholders(query)
+	}
+
 	start := time.Now()
 	result, err := s.db.ExecContext(ctx, query, args...)
 	duration := time.Since(start)
@@ -275,6 +302,10 @@ func (s *BaseStorage) QueryContext(ctx context.Context, query string, args ...an
 	// Timeout
 	ctx, cancel := context.WithTimeout(ctx, s.opts.QueryTimeout)
 	defer cancel()
+
+	if s.driver == "postgres" {
+		query = utils.ConvertPlaceholders(query)
+	}
 
 	start := time.Now()
 	rows, err := s.db.QueryContext(ctx, query, args...)
