@@ -1,0 +1,28 @@
+[Unit]
+Description=Wameter Agent
+After=network.target
+Documentation=https://github.com/haiyon/wameter
+
+[Service]
+Type=simple
+User=root
+ExecStart=/opt/wameter/bin/agent -config /etc/wameter/agent.yaml
+Restart=always
+RestartSec=10
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+# Resource limits
+LimitNOFILE=4096
+MemoryMax=256M
+TasksMax=100
+
+# Security options
+NoNewPrivileges=yes
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/var/log/wameter /var/lib/wameter/cache
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

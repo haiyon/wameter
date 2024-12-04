@@ -1,0 +1,33 @@
+{
+  "attachments": [
+    {
+      "color": "danger",
+      "title": "Agent Offline Alert",
+      "text": "An agent has gone offline and requires attention.",
+      "fields": [
+        {
+          "title": "Agent ID",
+          "value": "{{.Agent.ID}}",
+          "short": true
+        },
+        {
+          "title": "Hostname",
+          "value": "{{.Agent.Hostname}}",
+          "short": true
+        },
+        {
+          "title": "Last Seen",
+          "value": "{{.Agent.LastSeen | formatTime}}",
+          "short": true
+        },
+        {
+          "title": "Status",
+          "value": "{{.Agent.Status}}",
+          "short": true
+        }
+      ],
+      "footer": "Wameter Monitoring",
+      "ts": "{{.Timestamp.Unix}}"
+    }
+  ]
+}

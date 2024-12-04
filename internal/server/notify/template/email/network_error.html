@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    .header {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 5px;
+    }
+
+    .content {
+      margin: 20px 0;
+    }
+
+    .details {
+      background: #f1f3f5;
+      padding: 15px;
+      border-radius: 5px;
+    }
+
+    .footer {
+      color: #6c757d;
+      font-size: 12px;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h2>🔧 Network Errors Detected</h2>
+    <p>High number of network errors detected on an interface.</p>
+  </div>
+  <div class="content">
+    <div class="details">
+      <p><strong>Agent ID:</strong> {{.AgentID}}</p>
+      <p><strong>Interface:</strong> {{.Interface.Name}} ({{.Interface.Type}})</p>
+      <h3>Error Statistics:</h3>
+      <p><strong>RX Errors:</strong> {{.Interface.Statistics.RxErrors}}</p>
+      <p><strong>TX Errors:</strong> {{.Interface.Statistics.TxErrors}}</p>
+      <p><strong>RX Dropped:</strong> {{.Interface.Statistics.RxDropped}}</p>
+      <p><strong>TX Dropped:</strong> {{.Interface.Statistics.TxDropped}}</p>
+    </div>
+  </div>
+  <div class="footer">
+    <p>Alert generated at {{.Timestamp | formatTime}}</p>
+    <p>Wameter Monitoring System</p>
+  </div>
+</div>
+</body>
+</html>

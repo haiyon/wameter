@@ -1,146 +1,50 @@
 #!/bin/bash
+set -eo pipefail
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/utils.sh"
 
-# OS detection
-OS="$(uname)"
-case "$OS" in
-"Darwin") IS_MACOS=1 ;;
-"Linux") IS_MACOS=0 ;;
-*)
-    print_error "Unsupported operating system: $OS"
+usage() {
+    echo "Usage: $0 -c <agent|server>"
     exit 1
-    ;;
-esac
-
-# Paths (OS specific)
-if [ "$IS_MACOS" -eq 1 ]; then
-    BASE_DIR="/opt/wameter"
-    INSTALL_DIR="$BASE_DIR/bin"
-    CONFIG_DIR="$BASE_DIR/etc"
-    LOG_DIR="$BASE_DIR/log"
-    LAUNCH_AGENTS_DIR="$HOME/Library/LaunchAgents"
-    LAUNCH_DAEMONS_DIR="/Library/LaunchDaemons"
-else
-    INSTALL_DIR="/usr/local/bin"
-    CONFIG_DIR="/etc/wameter"
-    LOG_DIR="/var/log/wameter"
-    SYSTEMD_DIR="/etc/systemd/system"
-fi
-
-BINARY_NAME="wameter"
-SERVICE_NAME=$BINARY_NAME
-
-# Print functions
-print_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
 }
 
-print_warn() {
-    echo -e "${YELLOW}[WARN]${NC} $1"
-}
+while getopts "c:" opt; do
+    case $opt in
+        c) COMPONENT="$OPTARG" ;;
+        *) usage ;;
+    esac
+done
 
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
+[[ -z "$COMPONENT" || ! "$COMPONENT" =~ ^(agent|server)$ ]] && usage
 
-# Check root
-check_root() {
-    if [ "$IS_MACOS" -eq 1 ]; then
-        if [ "$EUID" -eq 0 ]; then
-            print_warn "Running as root on macOS is not recommended"
-            read -p "Continue anyway? (y/N) " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                exit 1
-            fi
-        fi
+get_component_paths "$COMPONENT"
+check_root
+
+uninstall() {
+    log_info "Uninstalling wameter-$COMPONENT..."
+
+    # Stop service
+    if is_service_active "$COMPONENT"; then
+        manage_service "stop" "$COMPONENT"
+    fi
+
+    # Remove service files
+    if [[ "$(detect_os)" == "linux" ]]; then
+        run_privileged systemctl disable "wameter-$COMPONENT"
+        run_privileged rm -f "/etc/systemd/system/wameter-${COMPONENT}.service"
+        run_privileged systemctl daemon-reload
     else
-        if [ "$EUID" -ne 0 ]; then
-            print_error "Please run as root"
-            exit 1
-        fi
-    fi
-}
-
-# Confirm uninstall
-confirm_uninstall() {
-    print_warn "This will uninstall Wameter and remove all its files."
-    read -p "Are you sure you want to continue? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_info "Uninstallation cancelled"
-        exit 0
-    fi
-}
-
-# Stop and remove service
-remove_service() {
-    if [ "$IS_MACOS" -eq 1 ]; then
-        print_info "Stopping and unloading service..."
-        launchctl stop "$SERVICE_NAME" 2>/dev/null || true
-        launchctl unload "$LAUNCH_AGENTS_DIR/$SERVICE_NAME.plist" 2>/dev/null || true
-        rm -f "$LAUNCH_AGENTS_DIR/$SERVICE_NAME.plist"
-        rm -f "/usr/local/bin/$BINARY_NAME" # Remove symlink
-    else
-        print_info "Stopping service..."
-        systemctl stop "$SERVICE_NAME" 2>/dev/null || true
-        systemctl disable "$SERVICE_NAME" 2>/dev/null || true
-        rm -f "$SYSTEMD_DIR/$SERVICE_NAME.service"
-        systemctl daemon-reload
-    fi
-}
-
-# Remove files
-remove_files() {
-    if [ "$IS_MACOS" -eq 1 ]; then
-        print_info "Removing application directory..."
-        if [ -d "$BASE_DIR" ]; then
-            sudo rm -rf "$BASE_DIR"
-        fi
-    else
-        print_info "Removing binary..."
-        rm -f "$INSTALL_DIR/$BINARY_NAME"
-
-        print_warn "The following directories and files will not be removed:"
-        print_warn "- Config directory: $CONFIG_DIR"
-        print_warn "- Log directory: $LOG_DIR"
-        print_warn "You can manually remove them if needed."
-    fi
-}
-
-# Check if installed
-check_installation() {
-    local installed=0
-    if [ "$IS_MACOS" -eq 1 ]; then
-        if [ -d "$BASE_DIR" ] || [ -f "/usr/local/bin/$BINARY_NAME" ] || [ -f "$LAUNCH_AGENTS_DIR/$SERVICE_NAME.plist" ]; then
-            installed=1
-        fi
-    else
-        if [ -f "$INSTALL_DIR/$BINARY_NAME" ] || [ -f "$SYSTEMD_DIR/$SERVICE_NAME.service" ]; then
-            installed=1
-        fi
+        run_privileged rm -f "/Library/LaunchDaemons/com.wameter.${COMPONENT}.plist"
     fi
 
-    if [ $installed -eq 0 ]; then
-        print_error "Wameter is not installed"
-        exit 1
-    fi
+    # Remove files
+    run_privileged rm -f "$INSTALL_BASE/bin/$BINARY_NAME"
+    run_privileged rm -f "$CONFIG_FILE"
+    run_privileged rm -f "$LOG_FILE"
+    [[ "$COMPONENT" = "agent" ]] && run_privileged rm -rf "$CACHE_DIR" || run_privileged rm -rf "$DB_DIR"
+
+    log_info "Uninstallation complete"
 }
 
-# Main uninstallation function
-main() {
-    check_root
-    check_installation
-    confirm_uninstall
-    remove_service
-    remove_files
-    print_info "Uninstallation completed successfully!"
-}
-
-# Entry point
-main "$@"
+uninstall

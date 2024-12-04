@@ -1,0 +1,38 @@
+{
+  "attachments": [
+    {
+      "color": "warning",
+      "title": "Network Errors Detected",
+      "text": "High number of network errors detected on interface {{.Interface.Name}}",
+      "fields": [
+        {
+          "title": "Agent ID",
+          "value": "{{.AgentID}}",
+          "short": true
+        },
+        {
+          "title": "Interface",
+          "value": "{{.Interface.Name}}",
+          "short": true
+        },
+        {
+          "title": "Type",
+          "value": "{{.Interface.Type}}",
+          "short": true
+        },
+        {
+          "title": "RX Errors",
+          "value": "{{.Interface.Statistics.RxErrors}}",
+          "short": true
+        },
+        {
+          "title": "TX Errors",
+          "value": "{{.Interface.Statistics.TxErrors}}",
+          "short": true
+        }
+      ],
+      "footer": "Wameter Monitoring",
+      "ts": "{{.Timestamp.Unix}}"
+    }
+  ]
+}

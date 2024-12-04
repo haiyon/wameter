@@ -1,0 +1,177 @@
+# Wameter Server Configuration Example
+server:
+  address: ":8080"
+  read_timeout: 30s
+  write_timeout: 30s
+  idle_timeout: 60s
+  metrics_path: "/metrics"
+
+  # TLS configuration
+  tls:
+    enabled: false
+    cert_file: "/etc/wameter/server.crt"
+    key_file: "/etc/wameter/server.key"
+    client_ca: "/etc/wameter/ca.crt"
+    min_version: "TLS1.2"
+    require_client_cert: false
+
+# Database configuration
+database:
+  driver: "sqlite"  # sqlite, mysql, postgres
+  # DSN can be a file path/connection string, e.g.
+  # SQLite: "/var/lib/wameter/data.db"
+  # MySQL: "wameter:secret@tcp(127.0.0.1:3306)/wameter?charset=utf8mb4&parseTime=True&loc=Local"
+  # PostgreSQL: "host=localhost user=wameter password=secret dbname=wameter sslmode=disable"
+  dsn: "/var/lib/wameter/data.db"
+  max_connections: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 1h
+  query_timeout: 30s
+  enable_pruning: true
+  metrics_retention: 720h  # 30 days
+  prune_interval: 24h
+
+# API configuration
+api:
+  enabled: true
+
+  # Authentication
+  auth:
+    enabled: true
+    type: "jwt"        # jwt, apikey, basic
+    jwt_secret: ""     # Set this in production
+    jwt_duration: 24h
+    allowed_users: # For apikey/basic auth
+      - "admin:secretpassword"
+
+  # CORS settings
+  cors:
+    enabled: true
+    allowed_origins:
+      - "*"
+    allowed_methods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "OPTIONS"
+    allowed_headers:
+      - "Content-Type"
+      - "Authorization"
+      - "X-Request-ID"
+    max_age: 86400
+    allow_credentials: true
+
+  # Rate limiting
+  rate_limit:
+    enabled: true
+    requests: 60     # Requests per window
+    window: 60s      # Time window
+    strategy: "token" # token, leaky, sliding
+
+  # API documentation
+  docs:
+    enabled: true
+    path: "/docs"
+    title: "Wameter API"
+    version: "v1"
+
+  # Metrics collection
+  metrics:
+    enabled: true
+    path: "/metrics"
+    prometheus: true
+    statsd_addr: "localhost:8125"
+    service_name: "wameter"
+
+# Notification configuration
+notify:
+  # Global notification settings
+  retry_attempts: 3
+  retry_delay: 5s
+  max_batch_size: 100
+  rate_limit:
+    enabled: true
+    interval: 1m
+    max_events: 60
+    per_channel: true
+
+  # Email notifications
+  email:
+    enabled: false
+    smtp_server: "smtp.example.com"
+    smtp_port: 587
+    username: "notifications@example.com"
+    password: ""  # Set this in production
+    from: "wameter@example.com"
+    to: [ "admin@example.com" ]
+    use_tls: true
+    templates: # Optional custom templates
+      agent_offline: "/etc/wameter/templates/email/agent_offline.html"
+      network_error: "/etc/wameter/templates/email/network_error.html"
+
+  # Telegram notifications
+  telegram:
+    enabled: false
+    bot_token: ""  # Set this in production
+    chat_ids: [ "-100123456789" ]
+    format: "markdown"  # text, html, markdown
+
+  # Slack notifications
+  slack:
+    enabled: false
+    webhook_url: ""  # Set this in production
+    channel: "#monitoring"
+    username: "Wameter Bot"
+    icon_emoji: ":chart_with_upwards_trend:"
+    icon_url: ""
+
+  # Discord notifications
+  discord:
+    enabled: false
+    webhook_url: ""  # Set this in production
+    username: "Wameter Bot"
+    avatar_url: ""
+
+  # Dingtalk notifications
+  dingtalk:
+    enabled: false
+    access_token: ""  # Set this in production
+    secret: ""  # Set this in production
+    at_mobiles: [ ]
+    at_user_ids: [ ]
+    at_all: false
+
+  # Wechat notifications
+  wechat:
+    enabled: false
+    corp_id: ""  # Set this in production
+    agent_id: 0  # Set this in production
+    secret: ""   # Set this in production
+    to_user: "@all"
+    to_party: ""
+    to_tag: ""
+
+  # Webhook notifications
+  webhook:
+    enabled: false
+    url: "https://hooks.example.com/wameter"
+    method: "POST"
+    secret: ""  # Set this in production
+    timeout: 10s
+    max_retries: 3
+    headers:
+      X-Custom-Header: "value"
+    common_data:
+      environment: "production"
+
+# Logging configuration
+log:
+  level: "info"
+  format: "json"
+  file: "/var/log/wameter/server.log"
+  max_size: 100    # MB
+  max_backups: 7   # files
+  max_age: 30      # days
+  compress: true
+  color: true

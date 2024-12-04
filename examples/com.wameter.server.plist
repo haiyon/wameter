@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.wameter.server</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/wameter/bin/server</string>
+        <string>-config</string>
+        <string>/opt/wameter/etc/server.yaml</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardErrorPath</key>
+    <string>/opt/wameter/log/server-error.log</string>
+    <key>StandardOutPath</key>
+    <string>/opt/wameter/log/server.log</string>
+    <key>WorkingDirectory</key>
+    <string>/opt/wameter</string>
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+    <key>HardResourceLimits</key>
+    <dict>
+        <key>NumberOfFiles</key>
+        <integer>8192</integer>
+    </dict>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+</dict>
+</plist>

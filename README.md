@@ -1,113 +1,92 @@
 # Wameter
 
-Wameter is a cross-platform IP monitoring tool that tracks internal and external IP address changes and sends notifications through multiple channels. It supports Linux, macOS, and Windows.
+Wameter is a cross-platform network monitoring tool for tracking interface metrics and IP changes with multi-channel
+notifications. It uses a server-agent architecture and supports multiple storage backends.
 
 ## Features
 
-- **Cross-platform compatibility**: Linux, macOS, Windows
-- **Network interface monitoring**:
-  - Multi-interface support
-  - Virtual interface monitoring (optional)
-  - Real-time statistics collection
-  - Status monitoring and error tracking
-- **External IP tracking**: Uses multiple providers
-- **Notifications**:
-  - Email notifications
-  - Telegram notifications
-- **Customizable settings**:
-  - Check intervals
-  - Interface filtering
-  - Notification content
-- **Low resource usage**
+- Monitor network interfaces and traffic statistics
+- Track external IP changes
+- Multiple notification channels (Email, Slack, Telegram, Discord, etc.)
+- Support multiple databases (SQLite, MySQL, PostgreSQL)
+- RESTful API with OpenAPI documentation
 
-## Quick Installation
+## Quick Start
 
-### Steps
-
-1. **Download or build the binary**:
-   Build a binary for your platform with:
-
-   ```bash
-   go build -o wameter
-   ```
-
-2. **Set up configuration**:
-   Create the configuration file directory:
-
-   ```bash
-   # Linux/macOS
-   sudo mkdir -p /etc/wameter
-   sudo cp config.example.json /etc/wameter/config.json
-
-   # Windows (Run PowerShell as Administrator)
-   New-Item -Path "C:\ProgramData\wameter" -ItemType Directory
-   Copy-Item config.example.json C:\ProgramData\wameter\config.json
-   ```
-
-3. **Start the service**:
-
-- On Linux/macOS:
-
-  ```bash
-  ./wameter -config /etc/wameter/config.json
-  ```
-
-- On Windows:
-
-  ```powershell
-  .\wameter.exe -config C:\ProgramData\wameter\config.json
-  ```
-
-## Configuration
-
-Configuration file example: `config.example.json`
-
-Key options:
-
-- `include_virtual`: Enable/disable monitoring of virtual interfaces
-- `exclude_interfaces`: List of interface names or patterns to exclude
-- `interface_types`: Types of interfaces to monitor
-- `stat_collection`: Options for statistics collection
-
-## Notifications
-
-- **Email**: Sends detailed updates with per-interface statistics
-- **Telegram**: Provides real-time updates on IP changes, bandwidth, and errors
-
-## Logging
-
-Default log file locations:
-
-- **Linux/macOS**: `/var/log/wameter/monitor.log`
-- **Windows**: `C:\ProgramData\wameter\logs\monitor.log`
-
-## Building
-
-To compile the binary for your current platform:
+### Install
 
 ```bash
-go build -o wameter
+# From source
+make build
+sudo make install
+
+# Using Docker
+docker pull ghcr.io/haiyon/wameter
+docker pull ghcr.io/haiyon/wameter-agent
 ```
 
-To cross-compile:
+### Configure
 
-- For Linux:
+Create configuration files:
 
-  ```bash
-  GOOS=linux GOARCH=amd64 go build -o wameter-linux
-  ```
+```bash
+sudo mkdir -p /etc/wameter
+sudo cp examples/server.example.yaml /etc/wameter/server.yaml
+sudo cp examples/agent.example.yaml /etc/wameter/agent.yaml
+```
 
-- For macOS:
+Edit configurations to match your environment.
 
-  ```bash
-  GOOS=darwin GOARCH=amd64 go build -o wameter-macos
-  ```
+### Run
 
-- For Windows:
+Using systemd:
 
-  ```bash
-  GOOS=windows GOARCH=amd64 go build -o wameter.exe
-  ```
+```bash
+# Server
+sudo systemctl enable wameter-server
+sudo systemctl start wameter-server
+
+# Agent
+sudo systemctl enable wameter-agent
+sudo systemctl start wameter-agent
+```
+
+Using command line:
+
+```bash
+wameter-server -config /etc/wameter/server.yaml
+wameter-agent -config /etc/wameter/agent.yaml
+```
+
+Using Docker:
+
+```bash
+# Server
+docker run -d \
+  -v /etc/wameter:/etc/wameter \
+  -p 8080:8080 \
+  ghcr.io/haiyon/wameter
+
+# Agent
+docker run -d \
+  -v /etc/wameter:/etc/wameter \
+  --net=host \
+  ghcr.io/haiyon/wameter-agent
+```
+
+## Maintenance
+
+Update components:
+
+```bash
+./scripts/update.sh -c [server|agent]
+```
+
+Uninstall components:
+
+```bash
+./scripts/uninstall.sh -c [server|agent]
+```
 
 ## License
 

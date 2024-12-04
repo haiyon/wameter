@@ -1,0 +1,96 @@
+# Wameter Agent Configuration Example
+agent:
+  id: ""
+  hostname: ""
+  port: 8081
+
+  # Server connection settings
+  server:
+    address: "http://localhost:8080"
+    timeout: 30s
+    # TLS settings
+    tls:
+      enabled: false
+      cert_file: "/etc/wameter/client.crt"
+      key_file: "/etc/wameter/client.key"
+      ca_file: "/etc/wameter/ca.crt"
+      # Skip TLS verification (not recommended for production)
+      insecure_skip_verify: false
+
+# Collector settings
+collector:
+  # Global collection interval
+  interval: 30s
+
+  # Network collector settings
+  network:
+    enabled: true
+    interfaces: [ "eth0" ]
+    exclude_patterns:
+      - "docker*"
+      - "veth*"
+      - "br-*"
+    include_virtual: false
+    check_external_ip: true
+    stat_interval: 10s
+    external_providers:
+      - "https://api.ipify.org"
+      - "https://ifconfig.me/ip"
+      - "https://icanhazip.com"
+    ip_version:
+      enable_ipv4: true
+      enable_ipv6: true
+      prefer_ipv6: false
+    filters:
+      - type: "interface"
+        name: "physical_only"
+        enabled: true
+        rules:
+          virtual: "false"
+          loopback: "false"
+      - type: "bandwidth"
+        name: "high_bandwidth"
+        enabled: true
+        rules:
+          min_speed: "1000"  # Mbps
+    stat_collection:
+      enabled: true
+      interval: 10
+      include_stats:
+        - "rx_bytes"
+        - "tx_bytes"
+        - "rx_packets"
+        - "tx_packets"
+        - "rx_errors"
+        - "tx_errors"
+
+  # Metrics collection settings
+  metrics:
+    enabled: true
+    interval: 60s
+    buffer_size: 1000
+    batch_size: 100
+    tags:
+      environment: "production"
+      role: "server"
+      location: "datacenter"
+
+# Logging configuration
+log:
+  level: "info"
+  format: "json"
+  file: "/var/log/wameter/agent.log"
+  max_size: 100    # Maximum size in MB before rotation
+  max_backups: 7   # Maximum number of old log files
+  max_age: 30      # Maximum number of days to retain logs
+  compress: true   # Compress rotated logs
+  color: true
+
+# Handler settings for receiving commands
+handler:
+  enabled: true
+  port: 8082
+  allowed_commands:
+    - "config_reload"
+    - "collector_restart"
+    - "update_agent"
