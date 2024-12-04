@@ -27,7 +27,7 @@ collector:
   # Network collector settings
   network:
     enabled: true
-    interfaces: ["eth0"]
+    interfaces: [ "eth0" ]
     exclude_patterns:
       - "docker*"
       - "veth*"

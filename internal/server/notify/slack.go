@@ -83,7 +83,7 @@ func (s *SlackNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 		return fmt.Errorf("failed to get template: %w", err)
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
@@ -113,7 +113,7 @@ func (s *SlackNotifier) NotifyNetworkErrors(agentID string, iface *types.Interfa
 		return fmt.Errorf("failed to get template: %w", err)
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
@@ -144,7 +144,7 @@ func (s *SlackNotifier) NotifyHighNetworkUtilization(agentID string, iface *type
 		return fmt.Errorf("failed to get template: %w", err)
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),

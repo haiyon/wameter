@@ -1,4 +1,4 @@
-package storage
+package database
 
 import (
 	"context"
@@ -11,70 +11,60 @@ import (
 
 	"wameter/internal/types"
 
-	"github.com/go-sql-driver/mysql"
+	"github.com/lib/pq"
+	_ "github.com/lib/pq"
 	"go.uber.org/zap"
 )
 
-// MySQLStorage implements Storage interface for MySQL
-type MySQLStorage struct {
-	*BaseStorage
+// PostgresDatabase implements Database interface for PostgreSQL
+type PostgresDatabase struct {
+	*BaseDatabase
 }
 
-// NewMySQLStorage creates a new MySQL storage instance
-func NewMySQLStorage(dsn string, opts Options, logger *zap.Logger) (*MySQLStorage, error) {
-	// Configure MySQL specific settings
-	cfg, err := mysql.ParseDSN(dsn)
-	if err != nil {
-		return nil, fmt.Errorf("invalid DSN: %w", err)
-	}
-
-	cfg.ParseTime = true
-	cfg.Timeout = opts.QueryTimeout
-	cfg.ReadTimeout = opts.QueryTimeout
-	cfg.WriteTimeout = opts.QueryTimeout
-
-	base, err := NewBaseStorage("mysql", cfg.FormatDSN(), opts, logger)
+// NewPostgresDatabase creates a new PostgreSQL database instance
+func NewPostgresDatabase(dsn string, opts Options, logger *zap.Logger) (*PostgresDatabase, error) {
+	base, err := NewBaseDatabase("postgres", dsn, opts, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	storage := &MySQLStorage{
-		BaseStorage: base,
+	database := &PostgresDatabase{
+		BaseDatabase: base,
 	}
 
-	if err := storage.initSchema(); err != nil {
+	if err := database.initSchema(); err != nil {
 		base.Close()
 		return nil, fmt.Errorf("failed to init schema: %w", err)
 	}
 
-	return storage, nil
+	return database, nil
 }
 
-// initSchema creates MySQL tables
-func (s *MySQLStorage) initSchema() error {
+// initSchema creates PostgreSQL tables
+func (s *PostgresDatabase) initSchema() error {
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS metrics (
-			id BIGINT AUTO_INCREMENT PRIMARY KEY,
+			id BIGSERIAL PRIMARY KEY,
 			agent_id VARCHAR(64) NOT NULL,
-			timestamp DATETIME NOT NULL,
-			collected_at DATETIME NOT NULL,
-			reported_at DATETIME NOT NULL,
-			data JSON NOT NULL,
-			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-			INDEX idx_metrics_agent_time (agent_id, timestamp)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-
+			timestamp TIMESTAMP NOT NULL,
+			collected_at TIMESTAMP NOT NULL,
+			reported_at TIMESTAMP NOT NULL,
+			data JSONB NOT NULL,
+			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_metrics_agent_time
+		ON metrics(agent_id, timestamp)`,
 		`CREATE TABLE IF NOT EXISTS agents (
 			id VARCHAR(64) PRIMARY KEY,
 			hostname VARCHAR(255) NOT NULL,
 			version VARCHAR(32) NOT NULL,
 			status VARCHAR(16) NOT NULL,
-			last_seen DATETIME NOT NULL,
-			registered_at DATETIME NOT NULL,
-			updated_at DATETIME NOT NULL,
-			INDEX idx_agents_status (status),
-			INDEX idx_agents_last_seen (last_seen)
-		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+			last_seen TIMESTAMP NOT NULL,
+			registered_at TIMESTAMP NOT NULL,
+			updated_at TIMESTAMP NOT NULL
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status)`,
+		`CREATE INDEX IF NOT EXISTS idx_agents_last_seen ON agents(last_seen)`,
 	}
 
 	tx, err := s.db.Begin()
@@ -93,7 +83,7 @@ func (s *MySQLStorage) initSchema() error {
 }
 
 // StartPruning starts the background pruning routine
-func (s *MySQLStorage) StartPruning(ctx context.Context) error {
+func (s *PostgresDatabase) StartPruning(ctx context.Context) error {
 	if !s.opts.EnablePruning {
 		return nil
 	}
@@ -122,18 +112,18 @@ func (s *MySQLStorage) StartPruning(ctx context.Context) error {
 }
 
 // StopPruning stops the pruning routine
-func (s *MySQLStorage) StopPruning() error {
+func (s *PostgresDatabase) StopPruning() error {
 	if s.pruneStop != nil {
 		close(s.pruneStop)
 	}
 	return nil
 }
 
-// SaveMetrics stores metrics data
-func (s *MySQLStorage) SaveMetrics(ctx context.Context, data *types.MetricsData) error {
+// SaveMetrics stores metrics
+func (s *PostgresDatabase) SaveMetrics(ctx context.Context, data *types.MetricsData) error {
 	query := `
 		INSERT INTO metrics (agent_id, timestamp, collected_at, reported_at, data)
-		VALUES (?, ?, ?, ?, ?)`
+		VALUES ($1, $2, $3, $4, $5)`
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -155,22 +145,22 @@ func (s *MySQLStorage) SaveMetrics(ctx context.Context, data *types.MetricsData)
 }
 
 // GetMetrics retrieves metrics
-func (s *MySQLStorage) GetMetrics(ctx context.Context, query *MetricsQuery, opts QueryOptions) ([]*types.MetricsData, error) {
+func (s *PostgresDatabase) GetMetrics(ctx context.Context, query *MetricsQuery, opts QueryOptions) ([]*types.MetricsData, error) {
 	qb := &QueryBuilder{}
 	qb.Reset()
 
 	baseQuery := `
 		SELECT data FROM metrics
-		WHERE timestamp BETWEEN ? AND ?`
+		WHERE timestamp BETWEEN $1 AND $2`
 
 	qb.args = append(qb.args, query.StartTime, query.EndTime)
 
 	if len(query.AgentIDs) > 0 {
-		qb.Where("agent_id IN (?)", query.AgentIDs)
+		qb.Where("agent_id = ANY($?)", pq.Array(query.AgentIDs))
 	}
 
 	if len(query.MetricTypes) > 0 {
-		qb.Where("JSON_EXTRACT(data, '$.type') IN (?)", query.MetricTypes)
+		qb.Where("data->>'type' = ANY($?)", pq.Array(query.MetricTypes))
 	}
 
 	if query.OrderBy != "" {
@@ -202,11 +192,11 @@ func (s *MySQLStorage) GetMetrics(ctx context.Context, query *MetricsQuery, opts
 	return results, rows.Err()
 }
 
-// GetLatestMetrics retrieves the latest metrics
-func (s *MySQLStorage) GetLatestMetrics(ctx context.Context, agentID string) (*types.MetricsData, error) {
+// GetLatestMetrics retrieves latest metrics
+func (s *PostgresDatabase) GetLatestMetrics(ctx context.Context, agentID string) (*types.MetricsData, error) {
 	query := `
         SELECT data FROM metrics
-        WHERE agent_id = ?
+        WHERE agent_id = $1
         ORDER BY timestamp DESC
         LIMIT 1`
 
@@ -228,10 +218,10 @@ func (s *MySQLStorage) GetLatestMetrics(ctx context.Context, agentID string) (*t
 }
 
 // GetAgent retrieves an agent
-func (s *MySQLStorage) GetAgent(ctx context.Context, agentID string) (*types.AgentInfo, error) {
+func (s *PostgresDatabase) GetAgent(ctx context.Context, agentID string) (*types.AgentInfo, error) {
 	query := `
         SELECT id, hostname, version, status, last_seen, registered_at, updated_at
-        FROM agents WHERE id = ?`
+        FROM agents WHERE id = $1`
 
 	row := s.db.QueryRowContext(ctx, query, agentID)
 
@@ -253,7 +243,7 @@ func (s *MySQLStorage) GetAgent(ctx context.Context, agentID string) (*types.Age
 }
 
 // Stats returns database statistics
-func (s *MySQLStorage) Stats() Stats {
+func (s *PostgresDatabase) Stats() Stats {
 	dbStats := s.db.Stats()
 	return Stats{
 		OpenConnections:   dbStats.OpenConnections,
@@ -269,42 +259,23 @@ func (s *MySQLStorage) Stats() Stats {
 	}
 }
 
-// Cleanup deletes old metrics
-func (s *MySQLStorage) Cleanup(ctx context.Context, before time.Time) error {
-	tx, err := s.db.BeginTx(ctx, nil)
+// Cleanup deletes old metrics data
+func (s *PostgresDatabase) Cleanup(ctx context.Context, before time.Time) error {
+	// PostgreSQL can handle large deletes efficiently
+	query := "DELETE FROM metrics WHERE timestamp < $1"
+	result, err := s.db.ExecContext(ctx, query, before)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-	defer tx.Rollback()
-
-	// Delete old metrics in batches to avoid long locks
-	batchSize := 10000
-	for {
-		query := "DELETE FROM metrics WHERE timestamp < ? LIMIT ?"
-		result, err := tx.ExecContext(ctx, query, before, batchSize)
-		if err != nil {
-			return fmt.Errorf("failed to cleanup metrics: %w", err)
-		}
-
-		affected, err := result.RowsAffected()
-		if err != nil {
-			return fmt.Errorf("failed to get affected rows: %w", err)
-		}
-
-		if affected < int64(batchSize) {
-			break
-		}
-
-		// Commit batch and start new transaction
-		if err := tx.Commit(); err != nil {
-			return fmt.Errorf("failed to commit transaction: %w", err)
-		}
-
-		tx, err = s.db.BeginTx(ctx, nil)
-		if err != nil {
-			return fmt.Errorf("failed to begin new transaction: %w", err)
-		}
+		return fmt.Errorf("failed to cleanup metrics: %w", err)
 	}
 
-	return tx.Commit()
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get affected rows: %w", err)
+	}
+
+	s.logger.Info("Cleanup completed",
+		zap.Time("before", before),
+		zap.Int64("deleted", affected))
+
+	return nil
 }

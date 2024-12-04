@@ -1,14 +1,14 @@
 # Wameter
 
 Wameter is a cross-platform network monitoring tool for tracking interface metrics and IP changes with multi-channel
-notifications. It uses a server-agent architecture and supports multiple storage backends.
+notifications. It uses a server-agent architecture and supports multiple database backends.
 
 ## Features
 
 - Network interface monitoring (physical and virtual)
 - Real-time network statistics and external IP tracking
 - Multiple notification channels (Email, Telegram, Webhook, Slack)
-- Flexible storage backends (SQLite, MySQL, PostgreSQL)
+- Flexible database backends (SQLite, MySQL, PostgreSQL)
 - Cross-platform support (Linux, macOS)
 - RESTful API
 
@@ -34,7 +34,7 @@ Server configuration (`/etc/wameter/server.yaml`):
 server:
   address: ":8080"
 
-storage:
+database:
   driver: "sqlite"
   dsn: "/var/lib/wameter/data.db"
 
@@ -58,7 +58,7 @@ agent:
 collector:
   network:
     enabled: true
-    interfaces: ["eth0"]
+    interfaces: [ "eth0" ]
     check_external_ip: true
 ```
 

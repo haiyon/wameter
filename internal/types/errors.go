@@ -4,5 +4,5 @@ import "errors"
 
 var (
 	ErrAgentNotFound = errors.New("agent not found")
-	ErrInvalidDriver = errors.New("invalid storage driver")
+	ErrInvalidDriver = errors.New("invalid database driver")
 )

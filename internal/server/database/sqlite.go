@@ -1,4 +1,4 @@
-package storage
+package database
 
 import (
 	"context"
@@ -15,32 +15,32 @@ import (
 	"go.uber.org/zap"
 )
 
-// SQLiteStorage implements Storage interface for SQLite
-type SQLiteStorage struct {
-	*BaseStorage
+// SQLiteDatabase implements Database interface for SQLite
+type SQLiteDatabase struct {
+	*BaseDatabase
 }
 
-// NewSQLiteStorage creates a new SQLite storage instance
-func NewSQLiteStorage(dsn string, opts Options, logger *zap.Logger) (*SQLiteStorage, error) {
-	base, err := NewBaseStorage("sqlite3", dsn, opts, logger)
+// NewSQLiteDatabase creates a new SQLite database instance
+func NewSQLiteDatabase(dsn string, opts Options, logger *zap.Logger) (*SQLiteDatabase, error) {
+	base, err := NewBaseDatabase("sqlite3", dsn, opts, logger)
 	if err != nil {
 		return nil, err
 	}
 
-	storage := &SQLiteStorage{
-		BaseStorage: base,
+	database := &SQLiteDatabase{
+		BaseDatabase: base,
 	}
 
-	if err := storage.initSchema(); err != nil {
+	if err := database.initSchema(); err != nil {
 		base.Close()
 		return nil, fmt.Errorf("failed to init schema: %w", err)
 	}
 
-	return storage, nil
+	return database, nil
 }
 
 // initSchema creates SQLite tables
-func (s *SQLiteStorage) initSchema() error {
+func (s *SQLiteDatabase) initSchema() error {
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS agents (
             id TEXT PRIMARY KEY,
@@ -85,7 +85,7 @@ func (s *SQLiteStorage) initSchema() error {
 }
 
 // StartPruning starts the background pruning routine
-func (s *SQLiteStorage) StartPruning(ctx context.Context) error {
+func (s *SQLiteDatabase) StartPruning(ctx context.Context) error {
 	if !s.opts.EnablePruning {
 		return nil
 	}
@@ -114,7 +114,7 @@ func (s *SQLiteStorage) StartPruning(ctx context.Context) error {
 }
 
 // StopPruning stops the pruning routine
-func (s *SQLiteStorage) StopPruning() error {
+func (s *SQLiteDatabase) StopPruning() error {
 	if s.pruneStop != nil {
 		close(s.pruneStop)
 	}
@@ -122,7 +122,7 @@ func (s *SQLiteStorage) StopPruning() error {
 }
 
 // SaveMetrics stores metrics data
-func (s *SQLiteStorage) SaveMetrics(ctx context.Context, data *types.MetricsData) error {
+func (s *SQLiteDatabase) SaveMetrics(ctx context.Context, data *types.MetricsData) error {
 	query := `
 		INSERT INTO metrics (agent_id, timestamp, collected_at, reported_at, data)
 		VALUES (?, ?, ?, ?, ?)`
@@ -147,7 +147,7 @@ func (s *SQLiteStorage) SaveMetrics(ctx context.Context, data *types.MetricsData
 }
 
 // GetMetrics retrieves metrics based on query
-func (s *SQLiteStorage) GetMetrics(ctx context.Context, query *MetricsQuery, opts QueryOptions) ([]*types.MetricsData, error) {
+func (s *SQLiteDatabase) GetMetrics(ctx context.Context, query *MetricsQuery, opts QueryOptions) ([]*types.MetricsData, error) {
 	qb := &QueryBuilder{}
 	qb.Reset()
 
@@ -198,7 +198,7 @@ func (s *SQLiteStorage) GetMetrics(ctx context.Context, query *MetricsQuery, opt
 }
 
 // GetLatestMetrics retrieves the latest metrics
-func (s *SQLiteStorage) GetLatestMetrics(ctx context.Context, agentID string) (*types.MetricsData, error) {
+func (s *SQLiteDatabase) GetLatestMetrics(ctx context.Context, agentID string) (*types.MetricsData, error) {
 	query := `
         SELECT data FROM metrics
         WHERE agent_id = ?
@@ -223,7 +223,7 @@ func (s *SQLiteStorage) GetLatestMetrics(ctx context.Context, agentID string) (*
 }
 
 // GetAgent retrieves an agent
-func (s *SQLiteStorage) GetAgent(ctx context.Context, agentID string) (*types.AgentInfo, error) {
+func (s *SQLiteDatabase) GetAgent(ctx context.Context, agentID string) (*types.AgentInfo, error) {
 	query := `
         SELECT id, hostname, version, status, last_seen, registered_at, updated_at
         FROM agents WHERE id = ?`
@@ -248,7 +248,7 @@ func (s *SQLiteStorage) GetAgent(ctx context.Context, agentID string) (*types.Ag
 }
 
 // Stats returns database statistics
-func (s *SQLiteStorage) Stats() Stats {
+func (s *SQLiteDatabase) Stats() Stats {
 	dbStats := s.db.Stats()
 	return Stats{
 		OpenConnections:   dbStats.OpenConnections,
@@ -265,7 +265,7 @@ func (s *SQLiteStorage) Stats() Stats {
 }
 
 // Cleanup deletes old metrics data
-func (s *SQLiteStorage) Cleanup(ctx context.Context, before time.Time) error {
+func (s *SQLiteDatabase) Cleanup(ctx context.Context, before time.Time) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)

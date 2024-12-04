@@ -13,8 +13,8 @@ import (
 
 	"wameter/internal/server/api"
 	"wameter/internal/server/config"
+	"wameter/internal/server/database"
 	"wameter/internal/server/service"
-	"wameter/internal/server/storage"
 	"wameter/internal/version"
 
 	"go.uber.org/zap"
@@ -54,10 +54,10 @@ func main() {
 	_, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize storage
-	store, err := storage.NewStorage(&cfg.Storage, logger)
+	// Initialize database
+	store, err := database.NewDatabase(&cfg.Database, logger)
 	if err != nil {
-		logger.Fatal("Failed to initialize storage", zap.Error(err))
+		logger.Fatal("Failed to initialize database", zap.Error(err))
 	}
 	defer store.Close()
 

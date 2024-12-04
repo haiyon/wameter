@@ -1,15 +1,35 @@
 {
-  "embeds": [{
-    "title": "Agent Offline Alert",
-    "description": "An agent has gone offline and requires attention.",
-    "color": 15158332,
-    "fields": [
-      {"name": "Agent ID", "value": "{{.Agent.ID}}", "inline": true},
-      {"name": "Hostname", "value": "{{.Agent.Hostname}}", "inline": true},
-      {"name": "Last Seen", "value": "{{.Agent.LastSeen | formatTime}}", "inline": false},
-      {"name": "Status", "value": "{{.Agent.Status}}", "inline": true}
-    ],
-    "footer": {"text": "Wameter Monitoring"},
-    "timestamp": "{{.Timestamp | formatTime}}"
-  }]
+  "embeds": [
+    {
+      "title": "Agent Offline Alert",
+      "description": "An agent has gone offline and requires attention.",
+      "color": 15158332,
+      "fields": [
+        {
+          "name": "Agent ID",
+          "value": "{{.Agent.ID}}",
+          "inline": true
+        },
+        {
+          "name": "Hostname",
+          "value": "{{.Agent.Hostname}}",
+          "inline": true
+        },
+        {
+          "name": "Last Seen",
+          "value": "{{.Agent.LastSeen | formatTime}}",
+          "inline": false
+        },
+        {
+          "name": "Status",
+          "value": "{{.Agent.Status}}",
+          "inline": true
+        }
+      ],
+      "footer": {
+        "text": "Wameter Monitoring"
+      },
+      "timestamp": "{{.Timestamp | formatTime}}"
+    }
+  ]
 }

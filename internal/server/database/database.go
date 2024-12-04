@@ -1,17 +1,18 @@
-package storage
+package database
 
 import (
 	"context"
 	"fmt"
 	"time"
+	"wameter/internal/server/config"
 
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
 )
 
-// Storage defines the interface for metric storage
-type Storage interface {
+// Database defines the interface for metric database
+type Database interface {
 	// Metrics
 
 	SaveMetrics(ctx context.Context, data *types.MetricsData) error
@@ -44,7 +45,7 @@ type Storage interface {
 	Close() error
 }
 
-// Metrics represents storage metrics
+// Metrics represents database metrics
 type Metrics struct {
 	QueryCount     int64
 	QueryErrors    int64
@@ -53,8 +54,8 @@ type Metrics struct {
 	LastErrorTime  time.Time
 }
 
-// NewStorage creates a storage instance based on driver type
-func NewStorage(config *Config, logger *zap.Logger) (Storage, error) {
+// NewDatabase creates a database instance based on driver type
+func NewDatabase(config *config.Database, logger *zap.Logger) (Database, error) {
 	// Default options
 	opts := Options{
 		MaxOpenConns:     25,
@@ -90,20 +91,20 @@ func NewStorage(config *Config, logger *zap.Logger) (Storage, error) {
 		opts.PruneInterval = config.PruneInterval
 	}
 
-	// Create storage based on driver
+	// Create database based on driver
 	switch config.Driver {
 	case "sqlite":
-		return NewSQLiteStorage(config.DSN, opts, logger)
+		return NewSQLiteDatabase(config.DSN, opts, logger)
 	case "mysql":
-		return NewMySQLStorage(config.DSN, opts, logger)
+		return NewMySQLDatabase(config.DSN, opts, logger)
 	case "postgres":
-		return NewPostgresStorage(config.DSN, opts, logger)
+		return NewPostgresDatabase(config.DSN, opts, logger)
 	default:
 		return nil, fmt.Errorf("%w: %s", types.ErrInvalidDriver, config.Driver)
 	}
 }
 
-// Stats represents database storage statistics
+// Stats represents database database statistics
 type Stats struct {
 	// Connection pool stats
 	OpenConnections   int           `json:"open_connections"`

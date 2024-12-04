@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"wameter/internal/server/config"
+	"wameter/internal/server/database"
 	"wameter/internal/server/notify"
-	"wameter/internal/server/storage"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
@@ -18,7 +18,7 @@ import (
 // Service represents the server service
 type Service struct {
 	config   *config.Config
-	storage  storage.Storage
+	database database.Database
 	notifier *notify.Manager
 	logger   *zap.Logger
 
@@ -29,7 +29,7 @@ type Service struct {
 }
 
 // NewService creates new service instance
-func NewService(cfg *config.Config, store storage.Storage, logger *zap.Logger) (*Service, error) {
+func NewService(cfg *config.Config, store database.Database, logger *zap.Logger) (*Service, error) {
 	// Initialize notifier
 	notifier, err := notify.NewManager(cfg.Notify, logger)
 	if err != nil {
@@ -40,7 +40,7 @@ func NewService(cfg *config.Config, store storage.Storage, logger *zap.Logger) (
 
 	svc := &Service{
 		config:     cfg,
-		storage:    store,
+		database:   store,
 		notifier:   notifier,
 		logger:     logger,
 		agents:     make(map[string]*types.AgentInfo),
@@ -61,7 +61,7 @@ func (s *Service) SaveMetrics(ctx context.Context, data *types.MetricsData) erro
 	s.updateAgentStatus(data, types.AgentStatusOnline)
 
 	// Save metrics
-	if err := s.storage.SaveMetrics(ctx, data); err != nil {
+	if err := s.database.SaveMetrics(ctx, data); err != nil {
 		return fmt.Errorf("failed to save metrics: %w", err)
 	}
 
@@ -73,7 +73,7 @@ func (s *Service) SaveMetrics(ctx context.Context, data *types.MetricsData) erro
 
 // GetMetrics retrieves metrics
 func (s *Service) GetMetrics(ctx context.Context, query MetricsQuery) ([]*types.MetricsData, error) {
-	storageQuery := &storage.MetricsQuery{
+	databaseQuery := &database.MetricsQuery{
 		AgentIDs:  query.AgentIDs,
 		StartTime: query.StartTime,
 		EndTime:   query.EndTime,
@@ -82,7 +82,7 @@ func (s *Service) GetMetrics(ctx context.Context, query MetricsQuery) ([]*types.
 		Order:     "DESC",
 	}
 
-	return s.storage.GetMetrics(ctx, storageQuery, storage.QueryOptions{Timeout: 10 * time.Second})
+	return s.database.GetMetrics(ctx, databaseQuery, database.QueryOptions{Timeout: 10 * time.Second})
 }
 
 // GetLatestMetrics retrieves the latest metrics
@@ -91,14 +91,14 @@ func (s *Service) GetLatestMetrics(ctx context.Context, agentID string) (*types.
 	endTime := time.Now()
 	startTime := endTime.Add(-1 * time.Hour)
 
-	metrics, err := s.storage.GetMetrics(ctx, &storage.MetricsQuery{
+	metrics, err := s.database.GetMetrics(ctx, &database.MetricsQuery{
 		AgentIDs:  []string{agentID},
 		StartTime: startTime,
 		EndTime:   endTime,
 		Limit:     1,
 		OrderBy:   "timestamp",
 		Order:     "DESC",
-	}, storage.QueryOptions{Timeout: 10 * time.Second})
+	}, database.QueryOptions{Timeout: 10 * time.Second})
 
 	if err != nil {
 		return nil, err
@@ -185,11 +185,11 @@ func (s *Service) HealthCheck(ctx context.Context) *HealthStatus {
 		Timestamp: time.Now(),
 	}
 
-	// Check storage
-	if err := s.checkStorageHealth(ctx); err != nil {
+	// Check database
+	if err := s.checkDatabaseHealth(ctx); err != nil {
 		status.Healthy = false
 		status.Details = append(status.Details, HealthDetail{
-			Component: "storage",
+			Component: "database",
 			Status:    "unhealthy",
 			Error:     err.Error(),
 		})
@@ -200,7 +200,7 @@ func (s *Service) HealthCheck(ctx context.Context) *HealthStatus {
 
 // Internal methods
 func (s *Service) startCleanupTask() {
-	ticker := time.NewTicker(s.config.Storage.PruneInterval)
+	ticker := time.NewTicker(s.config.Database.PruneInterval)
 	defer ticker.Stop()
 
 	for {
@@ -208,8 +208,8 @@ func (s *Service) startCleanupTask() {
 		case <-s.cleanupCtx.Done():
 			return
 		case <-ticker.C:
-			cutoff := time.Now().Add(-s.config.Storage.MetricsRetention)
-			if err := s.storage.Cleanup(context.Background(), cutoff); err != nil {
+			cutoff := time.Now().Add(-s.config.Database.MetricsRetention)
+			if err := s.database.Cleanup(context.Background(), cutoff); err != nil {
 				s.logger.Error("Failed to cleanup old metrics", zap.Error(err))
 			}
 		}
@@ -243,7 +243,7 @@ func (s *Service) checkAgentStatuses() {
 		if agent.Status == types.AgentStatusOnline {
 			if now.Sub(agent.LastSeen) > offlineThreshold {
 				agent.Status = types.AgentStatusOffline
-				s.storage.UpdateAgentStatus(context.Background(), id, types.AgentStatusOffline)
+				s.database.UpdateAgentStatus(context.Background(), id, types.AgentStatusOffline)
 
 				// Notify about agent going offline
 				s.notifier.NotifyAgentOffline(agent)
@@ -277,7 +277,7 @@ func (s *Service) updateAgentStatus(data *types.MetricsData, status types.AgentS
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
-			if err := s.storage.RegisterAgent(ctx, &agent); err != nil {
+			if err := s.database.RegisterAgent(ctx, &agent); err != nil {
 				if !errors.Is(err, types.ErrAgentNotFound) {
 					s.logger.Error("Failed to register agent",
 						zap.Error(err),
@@ -292,13 +292,13 @@ func (s *Service) updateAgentStatus(data *types.MetricsData, status types.AgentS
 		agent.Hostname = data.Hostname
 		agent.Version = data.Version
 
-		// Update storage asynchronously
+		// Update database asynchronously
 		agentCopy := *agent
 		go func(agent types.AgentInfo) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
-			if err := s.storage.UpdateAgentStatus(ctx, data.AgentID, agent.Status); err != nil {
+			if err := s.database.UpdateAgentStatus(ctx, data.AgentID, agent.Status); err != nil {
 				s.logger.Error("Failed to update agent status",
 					zap.Error(err),
 					zap.String("agent_id", data.AgentID))
@@ -328,17 +328,17 @@ func (s *Service) processMetricsNotifications(data *types.MetricsData) {
 	}
 }
 
-// checkStorageHealth checks the storage health
-func (s *Service) checkStorageHealth(ctx context.Context) error {
-	// Simple storage health check
-	_, err := s.storage.GetAgents(ctx)
+// checkDatabaseHealth checks the database health
+func (s *Service) checkDatabaseHealth(ctx context.Context) error {
+	// Simple database health check
+	_, err := s.database.GetAgents(ctx)
 	return err
 }
 
 // Stop stops the service and cleanup resources
 func (s *Service) Stop() error {
 	s.cleanupFn()
-	return s.storage.Close()
+	return s.database.Close()
 }
 
 // HealthStatus health check

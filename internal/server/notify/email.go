@@ -59,7 +59,7 @@ func (n *EmailNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	}
 
 	// Prepare data
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
@@ -84,7 +84,7 @@ func (n *EmailNotifier) NotifyNetworkErrors(agentID string, iface *types.Interfa
 	}
 
 	// Prepare data
-	data := map[string]interface{}{
+	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
@@ -109,7 +109,7 @@ func (n *EmailNotifier) NotifyHighNetworkUtilization(agentID string, iface *type
 	}
 
 	// Prepare data
-	data := map[string]interface{}{
+	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),

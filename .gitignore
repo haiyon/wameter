@@ -16,5 +16,5 @@ config.json
 /agent.yaml
 /server.yaml
 
-# storage
+# database
 /data.db

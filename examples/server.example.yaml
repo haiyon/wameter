@@ -15,8 +15,8 @@ server:
     min_version: "TLS1.2"
     require_client_cert: false
 
-# Storage configuration
-storage:
+# Database configuration
+database:
   driver: "sqlite"  # sqlite, mysql, postgres
   # DSN can be a file path/connection string, e.g.
   # SQLite: "/var/lib/wameter/data.db"
@@ -41,7 +41,7 @@ api:
     type: "jwt"        # jwt, apikey, basic
     jwt_secret: ""     # Set this in production
     jwt_duration: 24h
-    allowed_users:     # For apikey/basic auth
+    allowed_users: # For apikey/basic auth
       - "admin:secretpassword"
 
   # CORS settings
@@ -104,9 +104,9 @@ notify:
     username: "notifications@example.com"
     password: ""  # Set this in production
     from: "wameter@example.com"
-    to: ["admin@example.com"]
+    to: [ "admin@example.com" ]
     use_tls: true
-    templates:  # Optional custom templates
+    templates: # Optional custom templates
       agent_offline: "/etc/wameter/templates/email/agent_offline.html"
       network_error: "/etc/wameter/templates/email/network_error.html"
 
@@ -114,7 +114,7 @@ notify:
   telegram:
     enabled: false
     bot_token: ""  # Set this in production
-    chat_ids: ["-100123456789"]
+    chat_ids: [ "-100123456789" ]
     format: "markdown"  # text, html, markdown
 
   # Slack notifications
@@ -138,8 +138,8 @@ notify:
     enabled: false
     access_token: ""  # Set this in production
     secret: ""  # Set this in production
-    at_mobiles: []
-    at_user_ids: []
+    at_mobiles: [ ]
+    at_user_ids: [ ]
     at_all: false
 
   # Wechat notifications

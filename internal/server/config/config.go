@@ -4,18 +4,16 @@ import (
 	"fmt"
 	"time"
 
-	"wameter/internal/server/storage"
-
 	"github.com/spf13/viper"
 )
 
 // Config represents the complete server configuration
 type Config struct {
-	Server  ServerConfig   `mapstructure:"server"`
-	Storage storage.Config `mapstructure:"storage"`
-	Notify  NotifyConfig   `mapstructure:"notify"`
-	API     APIConfig      `mapstructure:"api"`
-	Log     LogConfig      `mapstructure:"log"`
+	Server   ServerConfig `mapstructure:"server"`
+	Database Database     `mapstructure:"database"`
+	Notify   NotifyConfig `mapstructure:"notify"`
+	API      APIConfig    `mapstructure:"api"`
+	Log      LogConfig    `mapstructure:"log"`
 }
 
 // ServerConfig represents the server configuration
@@ -202,9 +200,9 @@ func setDefaults(config *Config) {
 
 // validateConfig validates the configuration
 func validateConfig(config *Config) error {
-	// Validate storage configuration
-	if err := validateStorageConfig(&config.Storage); err != nil {
-		return fmt.Errorf("invalid storage config: %w", err)
+	// Validate database configuration
+	if err := config.Database.Validate(); err != nil {
+		return fmt.Errorf("invalid database config: %w", err)
 	}
 
 	// Validate TLS configuration
@@ -224,23 +222,6 @@ func validateConfig(config *Config) error {
 		return fmt.Errorf("invalid API config: %w", err)
 	}
 
-	return nil
-}
-
-// Validate storage configuration
-func validateStorageConfig(config *storage.Config) error {
-	if config.MaxConnections < 1 {
-		return fmt.Errorf("storage.max_connections must be positive")
-	}
-
-	switch config.Driver {
-	case "sqlite", "mysql", "postgres":
-		if config.DSN == "" {
-			return fmt.Errorf("storage DSN is required")
-		}
-	default:
-		return fmt.Errorf("unsupported storage driver: %s", config.Driver)
-	}
 	return nil
 }
 

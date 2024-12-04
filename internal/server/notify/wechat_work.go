@@ -122,7 +122,7 @@ func (w *WeChatNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	}
 
 	// Prepare data
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
@@ -145,7 +145,7 @@ func (w *WeChatNotifier) NotifyNetworkErrors(agentID string, iface *types.Interf
 	}
 
 	// Prepare data
-	data := map[string]interface{}{
+	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
@@ -169,7 +169,7 @@ func (w *WeChatNotifier) NotifyHighNetworkUtilization(agentID string, iface *typ
 	}
 
 	// Prepare data
-	data := map[string]interface{}{
+	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),

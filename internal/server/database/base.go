@@ -1,4 +1,4 @@
-package storage
+package database
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// Options defines storage options
+// Options defines database options
 type Options struct {
 	MaxOpenConns     int
 	MaxIdleConns     int
@@ -27,8 +27,8 @@ type Options struct {
 	PruneInterval    time.Duration
 }
 
-// BaseStorage is the base implementation of the Storage interface
-type BaseStorage struct {
+// BaseDatabase is the base implementation of the Database interface
+type BaseDatabase struct {
 	driver    string
 	db        *sql.DB
 	opts      Options
@@ -38,8 +38,8 @@ type BaseStorage struct {
 	replacer  func(string) string
 }
 
-// NewBaseStorage creates new BaseStorage
-func NewBaseStorage(driver, dsn string, opts Options, logger *zap.Logger) (*BaseStorage, error) {
+// NewBaseDatabase creates new BaseDatabase
+func NewBaseDatabase(driver, dsn string, opts Options, logger *zap.Logger) (*BaseDatabase, error) {
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
@@ -63,7 +63,7 @@ func NewBaseStorage(driver, dsn string, opts Options, logger *zap.Logger) (*Base
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &BaseStorage{
+	return &BaseDatabase{
 		driver:  driver,
 		db:      db,
 		opts:    opts,
@@ -73,46 +73,54 @@ func NewBaseStorage(driver, dsn string, opts Options, logger *zap.Logger) (*Base
 }
 
 // RegisterAgent registers a new agent or updates existing one
-func (s *BaseStorage) RegisterAgent(ctx context.Context, agent *types.AgentInfo) error {
+func (s *BaseDatabase) RegisterAgent(ctx context.Context, agent *types.AgentInfo) error {
 	return s.WithTransaction(ctx, func(tx *sql.Tx) error {
-		query := `
-							INSERT INTO agents (id, hostname, version, status, last_seen, registered_at, updated_at)
-							VALUES (?, ?, ?, ?, ?, ?, ?)`
-
+		// Check if the ID already exists
+		existsQuery := "SELECT COUNT(*) FROM agents WHERE id = ?"
 		if s.driver == "postgres" {
-			query += `ON CONFLICT (id) DO UPDATE SET
-            hostname = EXCLUDED.hostname,
-            version = EXCLUDED.version,
-            status = EXCLUDED.status,
-            last_seen = EXCLUDED.last_seen,
-            updated_at = EXCLUDED.updated_at`
-			query = utils.ConvertPlaceholders(query)
+			existsQuery = utils.ConvertPlaceholders(existsQuery)
+		}
+		var count int
+		err := tx.QueryRowContext(ctx, existsQuery, agent.ID).Scan(&count)
+		if err != nil {
+			return fmt.Errorf("failed to check agent existence: %w", err)
 		}
 
-		if s.driver == "mysql" {
-			query += `ON DUPLICATE KEY UPDATE
-            hostname = VALUES(hostname),
-            version = VALUES(version),
-            status = VALUES(status),
-            last_seen = VALUES(last_seen),
-            updated_at = VALUES(updated_at)`
+		if count > 0 {
+			// Exists, execute update
+			updateQuery := `UPDATE agents SET hostname = ?, version = ?, status = ?, last_seen = ?, updated_at = ? WHERE id = ?`
+			if s.driver == "postgres" {
+				updateQuery = utils.ConvertPlaceholders(updateQuery)
+			}
+			_, err = tx.ExecContext(ctx, updateQuery,
+				agent.Hostname,
+				agent.Version,
+				agent.Status,
+				agent.LastSeen,
+				agent.UpdatedAt,
+				agent.ID)
+		} else {
+			// Doesn't exist, execute insert
+			insertQuery := ` INSERT INTO agents (id, hostname, version, status, last_seen, registered_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
+			if s.driver == "postgres" {
+				insertQuery = utils.ConvertPlaceholders(insertQuery)
+			}
+			_, err = tx.ExecContext(ctx, insertQuery,
+				agent.ID,
+				agent.Hostname,
+				agent.Version,
+				agent.Status,
+				agent.LastSeen,
+				agent.RegisteredAt,
+				agent.UpdatedAt)
 		}
-
-		_, err := tx.ExecContext(ctx, query,
-			agent.ID,
-			agent.Hostname,
-			agent.Version,
-			agent.Status,
-			agent.LastSeen,
-			agent.RegisteredAt,
-			agent.UpdatedAt)
 
 		return err
 	})
 }
 
 // UpdateAgentStatus updates agent status
-func (s *BaseStorage) UpdateAgentStatus(ctx context.Context, agentID string, status types.AgentStatus) error {
+func (s *BaseDatabase) UpdateAgentStatus(ctx context.Context, agentID string, status types.AgentStatus) error {
 	query := `
         UPDATE agents
         SET status = ?, last_seen = ?, updated_at = ?
@@ -137,7 +145,7 @@ func (s *BaseStorage) UpdateAgentStatus(ctx context.Context, agentID string, sta
 }
 
 // GetAgents retrieves all agents
-func (s *BaseStorage) GetAgents(ctx context.Context) ([]*types.AgentInfo, error) {
+func (s *BaseDatabase) GetAgents(ctx context.Context) ([]*types.AgentInfo, error) {
 	query := `
         SELECT id, hostname, version, status, last_seen, registered_at, updated_at
         FROM agents
@@ -189,7 +197,7 @@ func (s *BaseStorage) GetAgents(ctx context.Context) ([]*types.AgentInfo, error)
 }
 
 // BatchSaveMetrics saves multiple metrics in a single transaction
-func (s *BaseStorage) BatchSaveMetrics(ctx context.Context, metrics []*types.MetricsData) error {
+func (s *BaseDatabase) BatchSaveMetrics(ctx context.Context, metrics []*types.MetricsData) error {
 	if len(metrics) == 0 {
 		return nil
 	}
@@ -234,7 +242,7 @@ func (s *BaseStorage) BatchSaveMetrics(ctx context.Context, metrics []*types.Met
 type TxFn func(*sql.Tx) error
 
 // WithTransaction executes operations in a transaction
-func (s *BaseStorage) WithTransaction(ctx context.Context, fn TxFn) error {
+func (s *BaseDatabase) WithTransaction(ctx context.Context, fn TxFn) error {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
@@ -265,7 +273,7 @@ func (s *BaseStorage) WithTransaction(ctx context.Context, fn TxFn) error {
 }
 
 // ExecContext executes a query
-func (s *BaseStorage) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+func (s *BaseDatabase) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	// Timeout
 	ctx, cancel := context.WithTimeout(ctx, s.opts.QueryTimeout)
 	defer cancel()
@@ -298,7 +306,7 @@ func (s *BaseStorage) ExecContext(ctx context.Context, query string, args ...any
 }
 
 // QueryContext executes a query
-func (s *BaseStorage) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+func (s *BaseDatabase) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	// Timeout
 	ctx, cancel := context.WithTimeout(ctx, s.opts.QueryTimeout)
 	defer cancel()
@@ -331,17 +339,17 @@ func (s *BaseStorage) QueryContext(ctx context.Context, query string, args ...an
 }
 
 // Close closes the database
-func (s *BaseStorage) Close() error {
+func (s *BaseDatabase) Close() error {
 	return s.db.Close()
 }
 
 // Ping pings the database
-func (s *BaseStorage) Ping(ctx context.Context) error {
+func (s *BaseDatabase) Ping(ctx context.Context) error {
 	return s.db.PingContext(ctx)
 }
 
 // Stats returns database statistics
-func (s *BaseStorage) Stats() *Stats {
+func (s *BaseDatabase) Stats() *Stats {
 	dbStats := s.db.Stats()
 	return &Stats{
 		OpenConnections:   dbStats.OpenConnections,
@@ -364,7 +372,7 @@ func scanMetrics(rows *sql.Rows, data *types.MetricsData) error {
 }
 
 // GetMetrics returns metrics
-func (s *BaseStorage) GetMetrics(ctx context.Context, query *MetricsQuery, opts QueryOptions) ([]*types.MetricsData, error) {
+func (s *BaseDatabase) GetMetrics(ctx context.Context, query *MetricsQuery, opts QueryOptions) ([]*types.MetricsData, error) {
 	if opts.Timeout == 0 {
 		opts.Timeout = 30 * time.Second
 	}

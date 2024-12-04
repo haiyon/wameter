@@ -75,7 +75,7 @@ func (d *DingTalkNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	}
 
 	// Prepare data
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
@@ -98,7 +98,7 @@ func (d *DingTalkNotifier) NotifyNetworkErrors(agentID string, iface *types.Inte
 	}
 
 	// Prepare data
-	data := map[string]interface{}{
+	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
@@ -121,7 +121,7 @@ func (d *DingTalkNotifier) NotifyHighNetworkUtilization(agentID string, iface *t
 	}
 
 	// Prepare data
-	data := map[string]interface{}{
+	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),

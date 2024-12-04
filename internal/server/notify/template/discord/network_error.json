@@ -1,16 +1,40 @@
 {
-  "embeds": [{
-    "title": "Network Errors Detected",
-    "description": "High number of network errors detected on interface {{.Interface.Name}}",
-    "color": 16776960,
-    "fields": [
-      {"name": "Agent ID", "value": "{{.AgentID}}", "inline": true},
-      {"name": "Interface", "value": "{{.Interface.Name}}", "inline": true},
-      {"name": "Type", "value": "{{.Interface.Type}}", "inline": true},
-      {"name": "RX Errors", "value": "{{.Interface.Statistics.RxErrors}}", "inline": true},
-      {"name": "TX Errors", "value": "{{.Interface.Statistics.TxErrors}}", "inline": true}
-    ],
-    "footer": {"text": "Wameter Monitoring"},
-    "timestamp": "{{.Timestamp | formatTime}}"
-  }]
+  "embeds": [
+    {
+      "title": "Network Errors Detected",
+      "description": "High number of network errors detected on interface {{.Interface.Name}}",
+      "color": 16776960,
+      "fields": [
+        {
+          "name": "Agent ID",
+          "value": "{{.AgentID}}",
+          "inline": true
+        },
+        {
+          "name": "Interface",
+          "value": "{{.Interface.Name}}",
+          "inline": true
+        },
+        {
+          "name": "Type",
+          "value": "{{.Interface.Type}}",
+          "inline": true
+        },
+        {
+          "name": "RX Errors",
+          "value": "{{.Interface.Statistics.RxErrors}}",
+          "inline": true
+        },
+        {
+          "name": "TX Errors",
+          "value": "{{.Interface.Statistics.TxErrors}}",
+          "inline": true
+        }
+      ],
+      "footer": {
+        "text": "Wameter Monitoring"
+      },
+      "timestamp": "{{.Timestamp | formatTime}}"
+    }
+  ]
 }

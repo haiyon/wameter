@@ -1,12 +1,12 @@
-package storage
+package config
 
 import (
 	"fmt"
 	"time"
 )
 
-// Config represents storage configuration
-type Config struct {
+// Database represents database configuration
+type Database struct {
 	Driver          string        `mapstructure:"driver"`
 	DSN             string        `mapstructure:"dsn"`
 	MaxConnections  int           `mapstructure:"max_connections"`
@@ -33,13 +33,13 @@ type Config struct {
 	EnableMetrics bool `mapstructure:"enable_metrics"`
 }
 
-// Validate validates storage configuration
-func (c *Config) Validate() error {
+// Validate validates database configuration
+func (c *Database) Validate() error {
 	if c.Driver == "" {
-		return fmt.Errorf("storage driver is required")
+		return fmt.Errorf("database driver is required")
 	}
 	if c.DSN == "" {
-		return fmt.Errorf("storage DSN is required")
+		return fmt.Errorf("database DSN is required")
 	}
 
 	// Set default values
@@ -76,7 +76,7 @@ func (c *Config) Validate() error {
 	case "sqlite", "mysql", "postgres":
 		// Valid drivers
 	default:
-		return fmt.Errorf("unsupported storage driver: %s", c.Driver)
+		return fmt.Errorf("unsupported database driver: %s", c.Driver)
 	}
 
 	return nil

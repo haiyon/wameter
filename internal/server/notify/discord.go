@@ -84,7 +84,7 @@ func (d *DiscordNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 		return fmt.Errorf("failed to get template: %w", err)
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
@@ -112,7 +112,7 @@ func (d *DiscordNotifier) NotifyNetworkErrors(agentID string, iface *types.Inter
 		return fmt.Errorf("failed to get template: %w", err)
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
@@ -141,7 +141,7 @@ func (d *DiscordNotifier) NotifyHighNetworkUtilization(agentID string, iface *ty
 		return fmt.Errorf("failed to get template: %w", err)
 	}
 
-	data := map[string]interface{}{
+	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
