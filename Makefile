@@ -60,9 +60,13 @@ build-agent:
 dist: build
 	@echo "Creating distribution package..."
 	@mkdir -p $(DIST_DIR)
-	@tar -czf $(DIST_ARCH) \
-		-C $(BIN_DIR) $(SERVER_BINARY) $(AGENT_BINARY) \
-		README.md LICENSE examples/
+	@if [ -f README.md ] && [ -f LICENSE ] && [ -d examples ]; then \
+		tar -czf $(DIST_ARCH) -C $(BIN_DIR) $(SERVER_BINARY) $(AGENT_BINARY) \
+			-C .. README.md LICENSE examples/; \
+	else \
+		tar -czf $(DIST_ARCH) -C $(BIN_DIR) $(SERVER_BINARY) $(AGENT_BINARY); \
+	fi
+	@echo "Created $(DIST_ARCH)"
 
 .PHONY: test
 test:
