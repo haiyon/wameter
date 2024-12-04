@@ -38,14 +38,14 @@ func main() {
 	// Load configuration
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 
 	// Initialize logger
 	logger, err := initLogger(cfg.Log)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
 	defer logger.Sync()

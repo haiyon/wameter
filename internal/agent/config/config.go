@@ -3,7 +3,9 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
+	commonCfg "wameter/internal/config"
 
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
@@ -105,6 +107,18 @@ type LogConfig struct {
 func LoadConfig(path string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigFile(path)
+	// Add search paths
+	v.AddConfigPath(".")
+	v.AddConfigPath("$HOME/.config/" + commonCfg.AppName)
+	v.AddConfigPath("$HOME/." + commonCfg.AppName)
+	v.AddConfigPath("/etc/" + commonCfg.AppName)
+	// Add current working directory
+	ex, err := os.Executable()
+	if err != nil {
+		return nil, err
+	}
+	v.AddConfigPath(filepath.Dir(ex))
+
 	v.SetConfigType("yaml")
 
 	if err := v.ReadInConfig(); err != nil {
