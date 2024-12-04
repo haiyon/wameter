@@ -1,70 +1,45 @@
 # Wameter
 
 Wameter is a cross-platform network monitoring tool for tracking interface metrics and IP changes with multi-channel
-notifications. It uses a server-agent architecture and supports multiple database backends.
+notifications. It uses a server-agent architecture and supports multiple storage backends.
 
 ## Features
 
-- Network interface monitoring (physical and virtual)
-- Real-time network statistics and external IP tracking
-- Multiple notification channels (Email, Telegram, Webhook, Slack)
-- Flexible database backends (SQLite, MySQL, PostgreSQL)
-- Cross-platform support (Linux, macOS)
-- RESTful API
+- Monitor network interfaces and traffic statistics
+- Track external IP changes
+- Multiple notification channels (Email, Slack, Telegram, Discord, etc.)
+- Support multiple databases (SQLite, MySQL, PostgreSQL)
+- RESTful API with OpenAPI documentation
 
 ## Quick Start
 
-### Installation
-
-Using installation script:
+### Install
 
 ```bash
-# Install server
-./scripts/install.sh -c server
+# From source
+make build
+sudo make install
 
-# Install agent
-./scripts/install.sh -c agent
+# Using Docker
+docker pull ghcr.io/haiyon/wameter
+docker pull ghcr.io/haiyon/wameter-agent
 ```
 
-### Configuration
+### Configure
 
-Server configuration (`/etc/wameter/server.yaml`):
+Create configuration files:
 
-```yaml
-server:
-  address: ":8080"
-
-database:
-  driver: "sqlite"
-  dsn: "/var/lib/wameter/data.db"
-
-notify:
-  email:
-    enabled: true
-    smtp_server: "smtp.example.com"
-  telegram:
-    enabled: true
-    bot_token: "your-bot-token"
+```bash
+sudo mkdir -p /etc/wameter
+sudo cp examples/server.example.yaml /etc/wameter/server.yaml
+sudo cp examples/agent.example.yaml /etc/wameter/agent.yaml
 ```
 
-Agent configuration (`/etc/wameter/agent.yaml`):
+Edit configurations to match your environment.
 
-```yaml
-agent:
-  id: "agent-1"
-  server:
-    address: "http://localhost:8080"
+### Run
 
-collector:
-  network:
-    enabled: true
-    interfaces: [ "eth0" ]
-    check_external_ip: true
-```
-
-### Running
-
-Using systemd (Linux):
+Using systemd:
 
 ```bash
 # Server
@@ -83,14 +58,21 @@ wameter-server -config /etc/wameter/server.yaml
 wameter-agent -config /etc/wameter/agent.yaml
 ```
 
-## API Endpoints
+Using Docker:
 
-- `GET /api/v1/metrics` - Get monitoring metrics
-- `GET /api/v1/agents` - List agents
-- `GET /api/v1/agents/:id` - Get agent details
-- `POST /api/v1/agents/:id/command` - Send command to agent
+```bash
+# Server
+docker run -d \
+  -v /etc/wameter:/etc/wameter \
+  -p 8080:8080 \
+  ghcr.io/haiyon/wameter
 
-Full API documentation is available at the `/docs` endpoint.
+# Agent
+docker run -d \
+  -v /etc/wameter:/etc/wameter \
+  --net=host \
+  ghcr.io/haiyon/wameter-agent
+```
 
 ## Maintenance
 

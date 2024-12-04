@@ -1,8 +1,6 @@
 # Wameter Agent Configuration Example
 agent:
-  # ID will be auto-generated if not set
   id: ""
-  # Hostname will use system hostname if not set
   hostname: ""
   port: 8081
 
