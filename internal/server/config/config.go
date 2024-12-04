@@ -104,56 +104,6 @@ type DocsConfig struct {
 	Version string `mapstructure:"version"`
 }
 
-// NotifyConfig represents the notification configuration
-type NotifyConfig struct {
-	Email    EmailConfig    `mapstructure:"email"`
-	Telegram TelegramConfig `mapstructure:"telegram"`
-	Webhook  WebhookConfig  `mapstructure:"webhook"`
-	Slack    SlackConfig    `mapstructure:"slack"`
-}
-
-// EmailConfig represents the email notification configuration
-type EmailConfig struct {
-	Enabled    bool              `mapstructure:"enabled"`
-	SMTPServer string            `mapstructure:"smtp_server"`
-	SMTPPort   int               `mapstructure:"smtp_port"`
-	Username   string            `mapstructure:"username"`
-	Password   string            `mapstructure:"password"`
-	From       string            `mapstructure:"from"`
-	To         []string          `mapstructure:"to"`
-	UseTLS     bool              `mapstructure:"use_tls"`
-	Templates  map[string]string `mapstructure:"templates"`
-}
-
-// TelegramConfig represents the telegram notification configuration
-type TelegramConfig struct {
-	Enabled  bool     `mapstructure:"enabled"`
-	BotToken string   `mapstructure:"bot_token"`
-	ChatIDs  []string `mapstructure:"chat_ids"`
-	Format   string   `mapstructure:"format"` // text, html, markdown
-}
-
-// WebhookConfig represents the webhook notification configuration
-type WebhookConfig struct {
-	Enabled    bool              `mapstructure:"enabled"`
-	URL        string            `mapstructure:"url"`
-	Secret     string            `mapstructure:"secret"`
-	Method     string            `mapstructure:"method"`
-	Timeout    time.Duration     `mapstructure:"timeout"`
-	MaxRetries int               `mapstructure:"max_retries"`
-	Headers    map[string]string `mapstructure:"headers"`
-	CommonData map[string]any    `mapstructure:"common_data"`
-}
-
-// SlackConfig represents the slack notification configuration
-type SlackConfig struct {
-	Enabled    bool   `mapstructure:"enabled"`
-	WebhookURL string `mapstructure:"webhook_url"`
-	Channel    string `mapstructure:"channel"`
-	Username   string `mapstructure:"username"`
-	IconEmoji  string `mapstructure:"icon_emoji"`
-}
-
 // LogConfig represents the logging configuration
 type LogConfig struct {
 	Level      string `mapstructure:"level"`
@@ -298,46 +248,6 @@ func validateStorageConfig(config *storage.Config) error {
 func validateTLSConfig(config *TLSConfig) error {
 	if config.CertFile == "" || config.KeyFile == "" {
 		return fmt.Errorf("TLS cert and key files are required")
-	}
-	return nil
-}
-
-// Validate notification configuration
-func validateNotifyConfig(config *NotifyConfig) error {
-	if config.Email.Enabled {
-		if err := validateEmailConfig(&config.Email); err != nil {
-			return fmt.Errorf("invalid email config: %w", err)
-		}
-	}
-	if config.Telegram.Enabled {
-		if err := validateTelegramConfig(&config.Telegram); err != nil {
-			return fmt.Errorf("invalid telegram config: %w", err)
-		}
-	}
-	return nil
-}
-
-// Validate email configuration
-func validateEmailConfig(config *EmailConfig) error {
-	if config.SMTPServer == "" {
-		return fmt.Errorf("SMTP server is required")
-	}
-	if config.From == "" {
-		return fmt.Errorf("sender email is required")
-	}
-	if len(config.To) == 0 {
-		return fmt.Errorf("at least one recipient is required")
-	}
-	return nil
-}
-
-// Validate telegram configuration
-func validateTelegramConfig(config *TelegramConfig) error {
-	if config.BotToken == "" {
-		return fmt.Errorf("telegram bot token is required")
-	}
-	if len(config.ChatIDs) == 0 {
-		return fmt.Errorf("at least one chat ID is required")
 	}
 	return nil
 }

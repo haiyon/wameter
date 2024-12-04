@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/spf13/viper"
 )
 
@@ -127,6 +129,18 @@ func LoadConfig(path string) (*Config, error) {
 
 // setDefaults sets default values if not specified
 func setDefaults(config *Config) {
+	if config.Agent.ID == "" {
+		config.Agent.ID = uuid.New().String()
+	}
+
+	if config.Agent.Hostname == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			hostname = "unknown-" + config.Agent.ID[:8]
+		}
+		config.Agent.Hostname = hostname
+	}
+
 	if config.Agent.Port == 0 {
 		config.Agent.Port = 8081
 	}

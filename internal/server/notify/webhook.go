@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	ntpl "wameter/internal/server/notify/template"
 
 	"wameter/internal/server/config"
 	"wameter/internal/types"
@@ -19,9 +20,10 @@ import (
 
 // WebhookNotifier represents  webhook notifier
 type WebhookNotifier struct {
-	config *config.WebhookConfig
-	logger *zap.Logger
-	client *http.Client
+	config    *config.WebhookConfig
+	logger    *zap.Logger
+	client    *http.Client
+	tplLoader *ntpl.Loader
 }
 
 // WebhookPayload represents the standard webhook payload structure
@@ -36,7 +38,7 @@ type WebhookPayload struct {
 }
 
 // NewWebhookNotifier creates new webhook notifier
-func NewWebhookNotifier(cfg *config.WebhookConfig, logger *zap.Logger) (*WebhookNotifier, error) {
+func NewWebhookNotifier(cfg *config.WebhookConfig, loader *ntpl.Loader, logger *zap.Logger) (*WebhookNotifier, error) {
 	client := &http.Client{
 		Timeout: time.Duration(cfg.Timeout),
 		Transport: &http.Transport{
@@ -49,9 +51,10 @@ func NewWebhookNotifier(cfg *config.WebhookConfig, logger *zap.Logger) (*Webhook
 	}
 
 	return &WebhookNotifier{
-		config: cfg,
-		logger: logger,
-		client: client,
+		config:    cfg,
+		logger:    logger,
+		client:    client,
+		tplLoader: loader,
 	}, nil
 }
 

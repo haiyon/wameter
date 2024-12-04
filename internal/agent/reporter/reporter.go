@@ -11,9 +11,9 @@ import (
 	"os"
 	"sync"
 	"time"
-
 	"wameter/internal/agent/config"
 	"wameter/internal/types"
+	"wameter/internal/version"
 
 	"go.uber.org/zap"
 )
@@ -108,6 +108,9 @@ func (r *Reporter) processLoop(ctx context.Context) {
 func (r *Reporter) sendData(ctx context.Context, data *types.MetricsData) error {
 	// Set agent ID
 	data.AgentID = r.config.Agent.ID
+
+	// Set version
+	data.Version = version.GetInfo().Version
 
 	// Set hostname if not set
 	if data.Hostname == "" {

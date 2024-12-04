@@ -6,114 +6,158 @@ import (
 	"fmt"
 	"html/template"
 	"net/smtp"
+	"strings"
 	"time"
+	ntpl "wameter/internal/server/notify/template"
 
 	"wameter/internal/server/config"
 	"wameter/internal/types"
-	"wameter/internal/utils"
 
 	"go.uber.org/zap"
 )
 
-// EmailNotifier represents an email notifier
+// EmailNotifier represents email notifier
 type EmailNotifier struct {
-	config *config.EmailConfig
-	logger *zap.Logger
-	tmpl   *template.Template
+	config    *config.EmailConfig
+	logger    *zap.Logger
+	tplLoader *ntpl.Loader
 }
 
-// NewEmailNotifier creates new email notifier
-func NewEmailNotifier(cfg *config.EmailConfig, logger *zap.Logger) (*EmailNotifier, error) {
-	// Parse email templates
-	tmpl, err := template.New("email").Funcs(template.FuncMap{
-		"formatBytes":     utils.FormatBytes,
-		"formatBytesRate": utils.FormatBytesRate,
-		"formatTime":      formatTime,
-	}).Parse(emailTemplates)
+// TemplateData represents the data structure for email templates
+type TemplateData struct {
+	Subject    string
+	Timestamp  time.Time
+	Agent      *types.AgentInfo
+	Interface  *types.InterfaceInfo
+	AgentID    string
+	FormatFunc template.FuncMap
+}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse email templates: %w", err)
+// NewEmailNotifier creates new Email notifier
+func NewEmailNotifier(cfg *config.EmailConfig, loader *ntpl.Loader, logger *zap.Logger) (*EmailNotifier, error) {
+	if !cfg.Enabled {
+		return nil, fmt.Errorf("email notifier is disabled")
+	}
+
+	if cfg.SMTPServer == "" || cfg.From == "" || len(cfg.To) == 0 {
+		return nil, fmt.Errorf("incomplete email configuration")
 	}
 
 	return &EmailNotifier{
-		config: cfg,
-		logger: logger,
-		tmpl:   tmpl,
+		config:    cfg,
+		logger:    logger,
+		tplLoader: loader,
 	}, nil
 }
 
-// NotifyAgentOffline sends an email notification
+// NotifyAgentOffline sends agent offline notification
 func (n *EmailNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
-	data := struct {
-		Agent     *types.AgentInfo
-		TimeStamp time.Time
-	}{
-		Agent:     agent,
-		TimeStamp: time.Now(),
+	// Get template
+	tmpl, err := n.tplLoader.GetTemplate(ntpl.Email, "agent_offline")
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
 	}
 
-	subject := fmt.Sprintf("Agent Offline Alert - %s", agent.Hostname)
-	return n.sendEmail(subject, "agent_offline", data)
-}
-
-// NotifyNetworkErrors sends an email notification
-func (n *EmailNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
-	data := struct {
-		AgentID   string
-		Interface *types.InterfaceInfo
-		TimeStamp time.Time
-	}{
-		AgentID:   agentID,
-		Interface: iface,
-		TimeStamp: time.Now(),
+	// Prepare data
+	data := map[string]interface{}{
+		"Agent":     agent,
+		"Timestamp": time.Now(),
 	}
 
-	subject := fmt.Sprintf("Network Errors Alert - %s - %s", agentID, iface.Name)
-	return n.sendEmail(subject, "network_errors", data)
-}
-
-// NotifyHighNetworkUtilization sends an email notification
-func (n *EmailNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
-	data := struct {
-		AgentID   string
-		Interface *types.InterfaceInfo
-		TimeStamp time.Time
-	}{
-		AgentID:   agentID,
-		Interface: iface,
-		TimeStamp: time.Now(),
-	}
-
-	subject := fmt.Sprintf("High Network Utilization - %s - %s", agentID, iface.Name)
-	return n.sendEmail(subject, "high_utilization", data)
-}
-
-// sendEmail sends an email
-func (n *EmailNotifier) sendEmail(subject, templateName string, data any) error {
-	var body bytes.Buffer
-	if err := n.tmpl.ExecuteTemplate(&body, templateName, data); err != nil {
+	// Execute template
+	var content bytes.Buffer
+	if err := tmpl.Execute(&content, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	// Prepare email message
-	msg := fmt.Sprintf("From: %s\r\n"+
-		"To: %s\r\n"+
-		"Subject: %s\r\n"+
-		"MIME-Version: 1.0\r\n"+
-		"Content-Type: text/html; charset=UTF-8\r\n"+
-		"\r\n%s", n.config.From,
-		n.config.To[0], subject, body.String())
+	// Send email
+	subject := fmt.Sprintf("Agent Offline Alert - %s", agent.Hostname)
+	return n.sendEmail(subject, content.String())
+}
 
-	// Configure TLS
+// NotifyNetworkErrors sends network errors notification
+func (n *EmailNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
+	// Get template
+	tmpl, err := n.tplLoader.GetTemplate(ntpl.Email, "network_error")
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
+	}
+
+	// Prepare data
+	data := map[string]interface{}{
+		"AgentID":   agentID,
+		"Interface": iface,
+		"Timestamp": time.Now(),
+	}
+
+	// Execute template
+	var content bytes.Buffer
+	if err := tmpl.Execute(&content, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	subject := fmt.Sprintf("Network Errors Alert - %s - %s", agentID, iface.Name)
+	return n.sendEmail(subject, content.String())
+}
+
+// NotifyHighNetworkUtilization sends high network utilization notification
+func (n *EmailNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
+	// Get template
+	tmpl, err := n.tplLoader.GetTemplate(ntpl.Email, "high_utilization")
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
+	}
+
+	// Prepare data
+	data := map[string]interface{}{
+		"AgentID":   agentID,
+		"Interface": iface,
+		"Timestamp": time.Now(),
+	}
+
+	// Execute template
+	var content bytes.Buffer
+	if err := tmpl.Execute(&content, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	subject := fmt.Sprintf("High Network Utilization - %s - %s", agentID, iface.Name)
+	return n.sendEmail(subject, content.String())
+}
+
+// sendEmail sends an email
+func (n *EmailNotifier) sendEmail(subject, content string) error {
+	auth := smtp.PlainAuth("", n.config.Username, n.config.Password, n.config.SMTPServer)
+
+	msg := buildEmailMessage(n.config.From, n.config.To, subject, content)
+
+	var err error
+	if n.config.UseTLS {
+		err = n.sendTLSEmail(auth, msg)
+	} else {
+		addr := fmt.Sprintf("%s:%d", n.config.SMTPServer, n.config.SMTPPort)
+		err = smtp.SendMail(addr, auth, n.config.From, n.config.To, msg)
+	}
+
+	if err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
+	return nil
+}
+
+// sendTLSEmail sends email
+func (n *EmailNotifier) sendTLSEmail(auth smtp.Auth, msg []byte) error {
+	addr := fmt.Sprintf("%s:%d", n.config.SMTPServer, n.config.SMTPPort)
+
 	tlsConfig := &tls.Config{
 		ServerName: n.config.SMTPServer,
 		MinVersion: tls.VersionTLS12,
 	}
 
-	// Connect to SMTP server
-	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", n.config.SMTPServer, n.config.SMTPPort), tlsConfig)
+	conn, err := tls.Dial("tcp", addr, tlsConfig)
 	if err != nil {
-		return fmt.Errorf("failed to connect to SMTP server: %w", err)
+		return fmt.Errorf("failed to create TLS connection: %w", err)
 	}
 	defer conn.Close()
 
@@ -123,142 +167,45 @@ func (n *EmailNotifier) sendEmail(subject, templateName string, data any) error 
 	}
 	defer client.Close()
 
-	// Authenticate
-	if n.config.Username != "" {
-		auth := smtp.PlainAuth("", n.config.Username, n.config.Password, n.config.SMTPServer)
-		if err := client.Auth(auth); err != nil {
-			return fmt.Errorf("SMTP authentication failed: %w", err)
+	if err = client.Auth(auth); err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+
+	if err = client.Mail(n.config.From); err != nil {
+		return fmt.Errorf("MAIL FROM failed: %w", err)
+	}
+
+	for _, addr := range n.config.To {
+		if err = client.Rcpt(addr); err != nil {
+			return fmt.Errorf("RCPT TO failed: %w", err)
 		}
 	}
 
-	// Set sender and recipients
-	if err := client.Mail(n.config.From); err != nil {
-		return fmt.Errorf("failed to set sender: %w", err)
-	}
-
-	for _, to := range n.config.To {
-		if err := client.Rcpt(to); err != nil {
-			return fmt.Errorf("failed to add recipient %s: %w", to, err)
-		}
-	}
-
-	// Send message
 	w, err := client.Data()
 	if err != nil {
-		return fmt.Errorf("failed to create message writer: %w", err)
+		return fmt.Errorf("DATA command failed: %w", err)
 	}
+	defer w.Close()
 
-	if _, err := w.Write([]byte(msg)); err != nil {
+	_, err = w.Write(msg)
+	if err != nil {
 		return fmt.Errorf("failed to write message: %w", err)
-	}
-
-	if err := w.Close(); err != nil {
-		return fmt.Errorf("failed to close message writer: %w", err)
 	}
 
 	return nil
 }
 
-// formatTime formats a time.Time as a string with the format "2006-01-02 15:04:05"
-func formatTime(t time.Time) string {
-	return t.Format("2006-01-02 15:04:05")
+// buildEmailMessage builds email message
+func buildEmailMessage(from string, to []string, subject, body string) []byte {
+	var msg bytes.Buffer
+
+	msg.WriteString(fmt.Sprintf("From: %s\r\n", from))
+	msg.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(to, ";")))
+	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	msg.WriteString("MIME-Version: 1.0\r\n")
+	msg.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	msg.WriteString("\r\n")
+	msg.WriteString(body)
+
+	return msg.Bytes()
 }
-
-// Email templates
-const emailTemplates = `
-{{define "agent_offline"}}
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .alert { background: #ffe0e0; padding: 15px; border-radius: 5px; }
-        .details { margin-top: 20px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="alert">
-            <h2>Agent Offline Alert</h2>
-            <p>An agent has gone offline:</p>
-        </div>
-        <div class="details">
-            <p><strong>Agent ID:</strong> {{.Agent.ID}}</p>
-            <p><strong>Hostname:</strong> {{.Agent.Hostname}}</p>
-            <p><strong>Last Seen:</strong> {{formatTime .Agent.LastSeen}}</p>
-            <p><strong>Status:</strong> {{.Agent.Status}}</p>
-        </div>
-        <p><small>Alert generated at {{formatTime .TimeStamp}}</small></p>
-    </div>
-</body>
-</html>
-{{end}}
-
-{{define "network_errors"}}
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .alert { background: #fff0e0; padding: 15px; border-radius: 5px; }
-        .details { margin-top: 20px; }
-        .stats { background: #f5f5f5; padding: 10px; border-radius: 3px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="alert">
-            <h2>Network Errors Detected</h2>
-            <p>High number of network errors detected on interface:</p>
-        </div>
-        <div class="details">
-            <p><strong>Agent ID:</strong> {{.AgentID}}</p>
-            <p><strong>Interface:</strong> {{.Interface.Name}} ({{.Interface.Type}})</p>
-            <div class="stats">
-                <p><strong>Rx Errors:</strong> {{.Interface.Statistics.RxErrors}}</p>
-                <p><strong>Tx Errors:</strong> {{.Interface.Statistics.TxErrors}}</p>
-                <p><strong>Dropped Packets:</strong> {{.Interface.Statistics.RxDropped}} (rx) / {{.Interface.Statistics.TxDropped}} (tx)</p>
-            </div>
-        </div>
-        <p><small>Alert generated at {{formatTime .TimeStamp}}</small></p>
-    </div>
-</body>
-</html>
-{{end}}
-
-{{define "high_utilization"}}
-<!DOCTYPE html>
-<html>
-<head>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .alert { background: #e0f0ff; padding: 15px; border-radius: 5px; }
-        .details { margin-top: 20px; }
-        .stats { background: #f5f5f5; padding: 10px; border-radius: 3px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="alert">
-            <h2>High Network Utilization</h2>
-            <p>High network utilization detected on interface:</p>
-        </div>
-        <div class="details">
-            <p><strong>Agent ID:</strong> {{.AgentID}}</p>
-            <p><strong>Interface:</strong> {{.Interface.Name}} ({{.Interface.Type}})</p>
-            <div class="stats">
-                <p><strong>Receive Rate:</strong> {{formatBytesRate .Interface.Statistics.RxBytesRate}}/s</p>
-                <p><strong>Transmit Rate:</strong> {{formatBytesRate .Interface.Statistics.TxBytesRate}}/s</p>
-                <p><strong>Total Received:</strong> {{formatBytes .Interface.Statistics.RxBytes}}</p>
-                <p><strong>Total Transmitted:</strong> {{formatBytes .Interface.Statistics.TxBytes}}</p>
-            </div>
-        </div>
-        <p><small>Alert generated at {{formatTime .TimeStamp}}</small></p>
-    </div>
-</body>
-</html>
-{{end}}
-`

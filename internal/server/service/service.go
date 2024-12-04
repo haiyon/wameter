@@ -58,7 +58,7 @@ func NewService(cfg *config.Config, store storage.Storage, logger *zap.Logger) (
 // SaveMetrics saves metrics data
 func (s *Service) SaveMetrics(ctx context.Context, data *types.MetricsData) error {
 	// Update agent status
-	s.updateAgentStatus(data.AgentID, types.AgentStatusOnline)
+	s.updateAgentStatus(data, types.AgentStatusOnline)
 
 	// Save metrics
 	if err := s.storage.SaveMetrics(ctx, data); err != nil {
@@ -253,22 +253,23 @@ func (s *Service) checkAgentStatuses() {
 }
 
 // updateAgentStatus updates the status of an agent
-func (s *Service) updateAgentStatus(agentID string, status types.AgentStatus) {
+func (s *Service) updateAgentStatus(data *types.MetricsData, status types.AgentStatus) {
 	s.agentsMu.Lock()
 	defer s.agentsMu.Unlock()
 
 	now := time.Now()
-	agent, exists := s.agents[agentID]
+	agent, exists := s.agents[data.AgentID]
 	if !exists {
 		agent = &types.AgentInfo{
-			ID:           agentID,
+			ID:           data.AgentID,
+			Hostname:     data.Hostname,
 			Status:       status,
 			RegisteredAt: now,
 			LastSeen:     now,
 			UpdatedAt:    now,
-			Version:      "unknown",
+			Version:      data.Version,
 		}
-		s.agents[agentID] = agent
+		s.agents[data.AgentID] = agent
 
 		// Register agent
 		agentCopy := *agent
@@ -280,7 +281,7 @@ func (s *Service) updateAgentStatus(agentID string, status types.AgentStatus) {
 				if !errors.Is(err, types.ErrAgentNotFound) {
 					s.logger.Error("Failed to register agent",
 						zap.Error(err),
-						zap.String("agent_id", agentID))
+						zap.String("agent_id", data.AgentID))
 				}
 			}
 		}(agentCopy)
@@ -288,6 +289,8 @@ func (s *Service) updateAgentStatus(agentID string, status types.AgentStatus) {
 		agent.Status = status
 		agent.LastSeen = now
 		agent.UpdatedAt = now
+		agent.Hostname = data.Hostname
+		agent.Version = data.Version
 
 		// Update storage asynchronously
 		agentCopy := *agent
@@ -295,10 +298,10 @@ func (s *Service) updateAgentStatus(agentID string, status types.AgentStatus) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 
-			if err := s.storage.UpdateAgentStatus(ctx, agentID, status); err != nil {
+			if err := s.storage.UpdateAgentStatus(ctx, data.AgentID, agent.Status); err != nil {
 				s.logger.Error("Failed to update agent status",
 					zap.Error(err),
-					zap.String("agent_id", agentID))
+					zap.String("agent_id", data.AgentID))
 			}
 		}(agentCopy)
 	}

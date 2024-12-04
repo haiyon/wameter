@@ -1,0 +1,18 @@
+{
+  "embeds": [{
+    "title": "High Network Utilization",
+    "description": "High network utilization detected on interface {{.Interface.Name}}",
+    "color": 16776960,
+    "fields": [
+      {"name": "Agent ID", "value": "{{.AgentID}}", "inline": true},
+      {"name": "Interface", "value": "{{.Interface.Name}}", "inline": true},
+      {"name": "Type", "value": "{{.Interface.Type}}", "inline": true},
+      {"name": "RX Rate", "value": "{{.Interface.Statistics.RxBytesRate | formatBytesRate}}/s", "inline": true},
+      {"name": "TX Rate", "value": "{{.Interface.Statistics.TxBytesRate | formatBytesRate}}/s", "inline": true},
+      {"name": "Total RX", "value": "{{.Interface.Statistics.RxBytes | formatBytes}}", "inline": true},
+      {"name": "Total TX", "value": "{{.Interface.Statistics.TxBytes | formatBytes}}", "inline": true}
+    ],
+    "footer": {"text": "Wameter Monitoring"},
+    "timestamp": "{{.Timestamp | formatTime}}"
+  }]
+}

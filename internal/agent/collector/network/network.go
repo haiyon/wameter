@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"wameter/internal/version"
 
 	"wameter/internal/agent/config"
 	"wameter/internal/types"
@@ -133,6 +134,7 @@ func (c *networkCollector) Collect(ctx context.Context) (*types.MetricsData, err
 	return &types.MetricsData{
 		AgentID:     c.agentID,
 		Hostname:    hostname,
+		Version:     version.GetInfo().Version,
 		Timestamp:   state.Timestamp,
 		CollectedAt: state.CollectedAt,
 		ReportedAt:  state.ReportedAt,

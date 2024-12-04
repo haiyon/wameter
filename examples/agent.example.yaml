@@ -1,17 +1,14 @@
-# Wameter Agent Configuration
+# Wameter Agent Configuration Example
 agent:
-  # Unique agent identifier, required
-  id: "agent-1"
-  # Agent hostname (optional, defaults to system hostname)
-  hostname: "host-1"
-  # HTTP API port for agent
+  # ID will be auto-generated if not set
+  id: ""
+  # Hostname will use system hostname if not set
+  hostname: ""
   port: 8081
 
   # Server connection settings
   server:
-    # Server address with protocol
     address: "http://localhost:8080"
-    # Connection timeout
     timeout: 30s
     # TLS settings
     tls:
@@ -30,53 +27,72 @@ collector:
   # Network collector settings
   network:
     enabled: true
-    # Network interfaces to monitor
-    interfaces:
-      - eth0
-      - wlan0
-    # Exclude interface patterns
+    interfaces: ["eth0"]
     exclude_patterns:
       - "docker*"
       - "veth*"
       - "br-*"
-    # Include virtual interfaces
     include_virtual: false
-    # Check external IP
     check_external_ip: true
-    # Statistics collection interval
     stat_interval: 10s
-    # External IP providers
     external_providers:
       - "https://api.ipify.org"
       - "https://ifconfig.me/ip"
       - "https://icanhazip.com"
-    # IP version settings
     ip_version:
       enable_ipv4: true
       enable_ipv6: true
       prefer_ipv6: false
+    filters:
+      - type: "interface"
+        name: "physical_only"
+        enabled: true
+        rules:
+          virtual: "false"
+          loopback: "false"
+      - type: "bandwidth"
+        name: "high_bandwidth"
+        enabled: true
+        rules:
+          min_speed: "1000"  # Mbps
+    stat_collection:
+      enabled: true
+      interval: 10
+      include_stats:
+        - "rx_bytes"
+        - "tx_bytes"
+        - "rx_packets"
+        - "tx_packets"
+        - "rx_errors"
+        - "tx_errors"
 
   # Metrics collection settings
   metrics:
     enabled: true
     interval: 60s
-    # Buffer size for collected metrics
     buffer_size: 1000
-    # Batch size for sending metrics
     batch_size: 100
+    tags:
+      environment: "production"
+      role: "server"
+      location: "datacenter"
 
 # Logging configuration
 log:
-  # Log level: debug, info, warn, error
   level: "info"
-  # Log format: json, console
   format: "json"
-  # Log file path
   file: "/var/log/wameter/agent.log"
-  # Log rotation settings
   max_size: 100    # Maximum size in MB before rotation
   max_backups: 7   # Maximum number of old log files
   max_age: 30      # Maximum number of days to retain logs
   compress: true   # Compress rotated logs
-  # Enable console color
   color: true
+
+# Handler settings for receiving commands
+handler:
+  enabled: true
+  port: 8082
+  allowed_commands:
+    - "config_reload"
+    - "collector_restart"
+    - "update_agent"

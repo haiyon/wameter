@@ -101,6 +101,7 @@ type InterfaceStats struct {
 type MetricsData struct {
 	AgentID     string    `json:"agent_id"`
 	Hostname    string    `json:"hostname"`
+	Version     string    `json:"version"`
 	Timestamp   time.Time `json:"timestamp"`
 	CollectedAt time.Time `json:"collected_at"`
 	ReportedAt  time.Time `json:"reported_at"`
