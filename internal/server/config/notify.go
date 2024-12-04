@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -142,6 +143,15 @@ func validateEmailConfig(config *EmailConfig) error {
 	}
 	if len(config.To) == 0 {
 		return fmt.Errorf("at least one recipient is required")
+	}
+
+	if !strings.Contains(config.From, "@") {
+		return fmt.Errorf("invalid sender email address: %s", config.From)
+	}
+	for _, to := range config.To {
+		if !strings.Contains(to, "@") {
+			return fmt.Errorf("invalid recipient email address: %s", to)
+		}
 	}
 	return nil
 }

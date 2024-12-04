@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	"html/template"
 	"net/smtp"
 	"strings"
 	"time"
@@ -23,24 +22,10 @@ type EmailNotifier struct {
 	tplLoader *ntpl.Loader
 }
 
-// TemplateData represents the data structure for email templates
-type TemplateData struct {
-	Subject    string
-	Timestamp  time.Time
-	Agent      *types.AgentInfo
-	Interface  *types.InterfaceInfo
-	AgentID    string
-	FormatFunc template.FuncMap
-}
-
 // NewEmailNotifier creates new Email notifier
 func NewEmailNotifier(cfg *config.EmailConfig, loader *ntpl.Loader, logger *zap.Logger) (*EmailNotifier, error) {
 	if !cfg.Enabled {
 		return nil, fmt.Errorf("email notifier is disabled")
-	}
-
-	if cfg.SMTPServer == "" || cfg.From == "" || len(cfg.To) == 0 {
-		return nil, fmt.Errorf("incomplete email configuration")
 	}
 
 	return &EmailNotifier{
@@ -52,77 +37,34 @@ func NewEmailNotifier(cfg *config.EmailConfig, loader *ntpl.Loader, logger *zap.
 
 // NotifyAgentOffline sends agent offline notification
 func (n *EmailNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
-	// Get template
-	tmpl, err := n.tplLoader.GetTemplate(ntpl.Email, "agent_offline")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
-	// Prepare data
 	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
-
-	// Execute template
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	// Send email
 	subject := fmt.Sprintf("Agent Offline Alert - %s", agent.Hostname)
-	return n.sendEmail(subject, content.String())
+	return n.sendTemplateEmail("agent_offline", data, subject)
 }
 
 // NotifyNetworkErrors sends network errors notification
 func (n *EmailNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
-	// Get template
-	tmpl, err := n.tplLoader.GetTemplate(ntpl.Email, "network_error")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
-	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-
-	// Execute template
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
 	subject := fmt.Sprintf("Network Errors Alert - %s - %s", agentID, iface.Name)
-	return n.sendEmail(subject, content.String())
+	return n.sendTemplateEmail("network_error", data, subject)
 }
 
 // NotifyHighNetworkUtilization sends high network utilization notification
 func (n *EmailNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
-	// Get template
-	tmpl, err := n.tplLoader.GetTemplate(ntpl.Email, "high_utilization")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
-	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-
-	// Execute template
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
 	subject := fmt.Sprintf("High Network Utilization - %s - %s", agentID, iface.Name)
-	return n.sendEmail(subject, content.String())
+	return n.sendTemplateEmail("high_utilization", data, subject)
 }
 
 // sendEmail sends an email
@@ -146,7 +88,7 @@ func (n *EmailNotifier) sendEmail(subject, content string) error {
 	return nil
 }
 
-// sendTLSEmail sends email
+// sendTLSEmail sends email with explicit connection handling
 func (n *EmailNotifier) sendTLSEmail(auth smtp.Auth, msg []byte) error {
 	addr := fmt.Sprintf("%s:%d", n.config.SMTPServer, n.config.SMTPPort)
 
@@ -171,13 +113,23 @@ func (n *EmailNotifier) sendTLSEmail(auth smtp.Auth, msg []byte) error {
 		return fmt.Errorf("authentication failed: %w", err)
 	}
 
-	if err = client.Mail(n.config.From); err != nil {
-		return fmt.Errorf("MAIL FROM failed: %w", err)
+	// Validate and clean the from address
+	from := n.config.From
+	if !strings.Contains(from, "@") {
+		return fmt.Errorf("invalid from address: %s", from)
+	}
+	from = cleanEmailAddress(from)
+
+	// Set sender
+	if err = client.Mail(from); err != nil {
+		return fmt.Errorf("MAIL FROM failed for %s: %w", from, err)
 	}
 
-	for _, addr := range n.config.To {
+	// Add recipients
+	cleanTo := cleanEmailAddresses(n.config.To)
+	for _, addr := range cleanTo {
 		if err = client.Rcpt(addr); err != nil {
-			return fmt.Errorf("RCPT TO failed: %w", err)
+			return fmt.Errorf("RCPT TO failed for %s: %w", addr, err)
 		}
 	}
 
@@ -185,27 +137,76 @@ func (n *EmailNotifier) sendTLSEmail(auth smtp.Auth, msg []byte) error {
 	if err != nil {
 		return fmt.Errorf("DATA command failed: %w", err)
 	}
-	defer w.Close()
 
-	_, err = w.Write(msg)
-	if err != nil {
+	if _, err = w.Write(msg); err != nil {
+		w.Close()
 		return fmt.Errorf("failed to write message: %w", err)
 	}
 
-	return nil
+	if err = w.Close(); err != nil {
+		return fmt.Errorf("failed to close message writer: %w", err)
+	}
+	return client.Quit()
+}
+
+// sendTemplateEmail sends an email
+func (n *EmailNotifier) sendTemplateEmail(templateName string, data map[string]any, subject string) error {
+	tmpl, err := n.tplLoader.GetTemplate(ntpl.Email, templateName)
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
+	}
+
+	var content bytes.Buffer
+	if err := tmpl.Execute(&content, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return n.sendEmail(subject, content.String())
 }
 
 // buildEmailMessage builds email message
 func buildEmailMessage(from string, to []string, subject, body string) []byte {
 	var msg bytes.Buffer
 
-	msg.WriteString(fmt.Sprintf("From: %s\r\n", from))
-	msg.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(to, ";")))
-	msg.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
-	msg.WriteString("MIME-Version: 1.0\r\n")
-	msg.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	// Clean and format addresses
+	cleanFrom := cleanEmailAddress(from)
+	cleanTo := cleanEmailAddresses(to)
+
+	// Add headers with proper line endings
+	headers := map[string]string{
+		"From":         cleanFrom,
+		"To":           strings.Join(cleanTo, ", "),
+		"Subject":      subject,
+		"MIME-Version": "1.0",
+		"Content-Type": "text/html; charset=UTF-8",
+		"X-Mailer":     "Wameter/1.0",
+		"Date":         time.Now().Format(time.RFC1123Z),
+	}
+
+	for key, value := range headers {
+		msg.WriteString(fmt.Sprintf("%s: %s\r\n", key, value))
+	}
+
 	msg.WriteString("\r\n")
 	msg.WriteString(body)
+	msg.WriteString("\r\n")
 
 	return msg.Bytes()
+}
+
+// cleanEmailAddress cleans email address by removing display name and angle brackets
+func cleanEmailAddress(addr string) string {
+	if idx := strings.LastIndex(addr, "<"); idx >= 0 {
+		return strings.Trim(addr[idx:], "<>")
+	}
+	return addr
+}
+
+// cleanEmailAddresses cleans a list of email addresses
+func cleanEmailAddresses(addrs []string) []string {
+	cleaned := make([]string, len(addrs))
+	for i, addr := range addrs {
+		cleaned[i] = cleanEmailAddress(addr)
+	}
+	return cleaned
 }
