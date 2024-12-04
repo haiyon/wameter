@@ -170,6 +170,9 @@ jobs:
           file: docker/server/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            TARGETOS=linux
+            TARGETARCH=${{ matrix.arch }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
@@ -180,5 +183,8 @@ jobs:
           file: docker/agent/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          build-args: |
+            TARGETOS=linux
+            TARGETARCH=${{ matrix.arch }}
           tags: ${{ steps.meta.outputs.tags }}-agent
           labels: ${{ steps.meta.outputs.labels }}

@@ -2,7 +2,7 @@
 FROM golang:1.22-alpine AS builder
 
 # Install build dependencies
-RUN apk add --no-cache make git
+RUN apk add --no-cache make git gcc libc-dev
 
 WORKDIR /src
 
@@ -14,7 +14,18 @@ RUN go mod download
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 make build-server
+ARG TARGETOS
+ARG TARGETARCH
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    CGO_ENABLED=0 go build \
+    -trimpath \
+    -ldflags "-s -w \
+    -X 'wameter/internal/version.Version=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")' \
+    -X 'wameter/internal/version.GitCommit=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")' \
+    -X 'wameter/internal/version.BuildDate=$(date -u "+%Y-%m-%d_%H:%M:%S")' \
+    -X 'wameter/internal/version.GoVersion=$(go version | cut -d" " -f3)'" \
+    -o /src/bin/wameter-server \
+    ./cmd/server
 
 # Final stage
 FROM alpine:3.19
@@ -27,7 +38,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata
 
 # Copy binary and config
-COPY --from=builder /src/bin/*_*/wameter-server /app/
+COPY --from=builder /src/bin/wameter-server /app/
 COPY --from=builder /src/examples/server.example.yaml /app/config/server.yaml
 COPY docker/server/entrypoint.sh /app/
 
