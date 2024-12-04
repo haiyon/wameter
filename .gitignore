@@ -1,14 +1,12 @@
 .idea/
 .vscode/
-
-.DS_Store
-
-logs/*
-
-/.VSCodeCounter/
-
+.VSCodeCounter/
+bin/
 build/
 dist/
+logs/
+
+.DS_Store
 
 # config
 !config.example.json
