@@ -5,10 +5,12 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: read
   pull-requests: read
+  packages: write
 
 jobs:
   verify:
@@ -27,7 +29,9 @@ jobs:
           cache: true
 
       - name: Verify dependencies
-        run: go mod verify
+        run: |
+          make verify
+          git diff --exit-code || (echo "go.mod or go.sum files are not up to date" && exit 1)
 
       - name: Run tests
         run: make test
@@ -54,6 +58,8 @@ jobs:
             arch: amd64
           - os: darwin
             arch: arm64
+          - os: windows
+            arch: amd64
 
     steps:
       - uses: actions/checkout@v4
@@ -72,18 +78,18 @@ jobs:
         with:
           platforms: arm64
 
-      - name: Build dist
+      - name: Build
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
-        run: make dist
+        run: make build
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: wameter-${{ matrix.os }}-${{ matrix.arch }}
-          path: build/dist/
-          retention-days: 1
+          path: bin/
+          retention-days: 7
 
   docker:
     name: Docker Build
@@ -123,7 +129,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: build/package/Dockerfile.server
+          file: docker/server/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -133,7 +139,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: build/package/Dockerfile.agent
+          file: docker/agent/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}-agent

@@ -1,0 +1,26 @@
+# Git
+.git
+.gitignore
+
+# Build
+bin/
+dist/
+build/
+vendor/
+coverage.*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Misc
+*.md
+LICENSE
+Makefile
+.dockerignore
+Dockerfile*
+*.yml
+*.yaml
+.env*

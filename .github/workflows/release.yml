@@ -33,7 +33,7 @@ jobs:
           cache: true
 
       - name: Verify dependencies
-        run: go mod verify
+        run: make verify
 
       - name: Run tests
         run: make test
@@ -44,24 +44,23 @@ jobs:
           version: latest
           args: --out-format=colored-line-number
 
-  build:
-    name: Build
+  build-all:
+    name: Build All Platforms
     needs: verify
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
       matrix:
         include:
           - os: linux
             arch: amd64
           - os: linux
             arch: arm64
-          - os: linux
-            arch: 386
           - os: darwin
             arch: amd64
           - os: darwin
             arch: arm64
+          - os: windows
+            arch: amd64
 
     steps:
       - uses: actions/checkout@v4
@@ -89,23 +88,24 @@ jobs:
         with:
           platforms: arm64
 
-      - name: Build dist
+      - name: Build for platform
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
           VERSION: ${{ env.VERSION }}
-        run: make dist
+        run: |
+          make build dist
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wameter-${{ matrix.os }}-${{ matrix.arch }}
-          path: build/dist/
-          retention-days: 1
+          name: wameter-${{ env.VERSION }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/
+          retention-days: 7
 
   release:
     name: Create Release
-    needs: build
+    needs: build-all
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -119,55 +119,15 @@ jobs:
       - name: Generate checksums
         working-directory: artifacts
         run: |
-          sha256sum *.tar.gz > sha256sums.txt
-
-      - name: Generate changelog
-        id: changelog
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const { data: releases } = await github.rest.repos.listReleases({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              per_page: 1
-            });
-
-            const { data: commits } = await github.rest.repos.compareCommits({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              base: releases[0]?.tag_name || 'HEAD~10',
-              head: 'HEAD'
-            });
-
-            const changelog = commits.commits
-              .map(commit => `- ${commit.commit.message.split('\n')[0]}`)
-              .join('\n');
-
-            return changelog;
+          find . -type f -name "*.tar.gz" -exec sha256sum {} \; > sha256sums.txt
 
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
           name: Release ${{ env.VERSION }}
           files: |
-            artifacts/*.tar.gz
+            artifacts/**/*.tar.gz
             artifacts/sha256sums.txt
-          body: |
-            ## Changes
-            ${{ steps.changelog.outputs.result }}
-
-            ## Installation
-            Download the appropriate version for your platform and architecture.
-
-            ```bash
-            # Verify checksum
-            sha256sum --check sha256sums.txt
-
-            # Extract archive
-            tar xzf wameter-*.tar.gz
-            ```
-
-            See [README.md](README.md) for detailed installation instructions.
           draft: true
           prerelease: ${{ contains(env.VERSION, '-rc') || contains(env.VERSION, '-beta') || contains(env.VERSION, '-alpha') }}
           generate_release_notes: true
@@ -203,34 +163,22 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
 
-      - name: Build and push release images
+      - name: Build and push server image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: build/package/Dockerfile.server
+          file: docker/server/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Build and push agent release images
+      - name: Build and push agent image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: build/package/Dockerfile.agent
+          file: docker/agent/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta.outputs.tags }}-agent
           labels: ${{ steps.meta.outputs.labels }}
-
-  cleanup:
-    name: Cleanup
-    needs: release
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete artifacts
-        uses: geekyeggo/delete-artifact@v4
-        with:
-          name: |
-            wameter-*
