@@ -7,7 +7,6 @@ import (
 	"time"
 	commonCfg "wameter/internal/config"
 
-	"github.com/google/uuid"
 	"github.com/spf13/viper"
 )
 
@@ -143,10 +142,6 @@ func LoadConfig(path string) (*Config, error) {
 
 // setDefaults sets default values if not specified
 func setDefaults(config *Config) {
-	if config.Agent.ID == "" {
-		config.Agent.ID = uuid.New().String()
-	}
-
 	if config.Agent.Hostname == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
