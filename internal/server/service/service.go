@@ -243,8 +243,11 @@ func (s *Service) checkAgentStatuses() {
 		if agent.Status == types.AgentStatusOnline {
 			if now.Sub(agent.LastSeen) > offlineThreshold {
 				agent.Status = types.AgentStatusOffline
-				s.database.UpdateAgentStatus(context.Background(), id, types.AgentStatusOffline)
-
+				if err := s.database.UpdateAgentStatus(context.Background(), id, types.AgentStatusOffline); err != nil {
+					s.logger.Error("Failed to update agent status",
+						zap.Error(err),
+						zap.String("agent_id", id))
+				}
 				// Notify about agent going offline
 				s.notifier.NotifyAgentOffline(agent)
 			}

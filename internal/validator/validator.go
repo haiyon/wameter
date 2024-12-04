@@ -25,8 +25,12 @@ func New() *Validator {
 		validate = validator.New()
 
 		// Register custom validation functions
-		validate.RegisterValidation("mac", validateMAC)
-		validate.RegisterValidation("hostname", validateHostname)
+		if err := validate.RegisterValidation("mac", validateMAC); err != nil {
+			panic(fmt.Sprintf("failed to register mac validation: %v", err))
+		}
+		if err := validate.RegisterValidation("hostname", validateHostname); err != nil {
+			panic(fmt.Sprintf("failed to register hostname validation: %v", err))
+		}
 
 		// Register custom type functions
 		validate.RegisterCustomTypeFunc(validateTime, TimeType{})

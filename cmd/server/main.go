@@ -48,7 +48,11 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
-	defer logger.Sync()
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
+		}
+	}()
 
 	// Create context with cancellation
 	_, cancel := context.WithCancel(context.Background())
@@ -59,14 +63,22 @@ func main() {
 	if err != nil {
 		logger.Fatal("Failed to initialize database", zap.Error(err))
 	}
-	defer store.Close()
+	defer func(store database.Database) {
+		if err := store.Close(); err != nil {
+			logger.Error("Failed to close database", zap.Error(err))
+		}
+	}(store)
 
 	// Initialize service
 	svc, err := service.NewService(cfg, store, logger)
 	if err != nil {
 		logger.Fatal("Failed to initialize service", zap.Error(err))
 	}
-	defer svc.Stop()
+	defer func(svc *service.Service) {
+		if err := svc.Stop(); err != nil {
+			logger.Error("Failed to stop service", zap.Error(err))
+		}
+	}(svc)
 
 	// Initialize router
 	router := api.NewRouter(cfg, svc, logger)

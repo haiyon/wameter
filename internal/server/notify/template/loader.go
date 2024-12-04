@@ -59,10 +59,10 @@ func (t *Loader) loadDefaultTemplates() error {
 		DingTalk,
 		Discord,
 	} {
-		pattern := fmt.Sprintf("%s", tplType)
+		pattern := string(tplType)
 		tmpl := template.New("").Funcs(templateFuncs)
 
-		entries, err := templateFS.ReadDir(fmt.Sprintf("%s", tplType))
+		entries, err := templateFS.ReadDir(pattern)
 		if err != nil {
 			return fmt.Errorf("failed to read template directory: %w", err)
 		}

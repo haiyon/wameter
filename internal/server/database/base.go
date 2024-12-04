@@ -35,7 +35,6 @@ type BaseDatabase struct {
 	logger    *zap.Logger
 	metrics   *Metrics
 	pruneStop chan struct{}
-	replacer  func(string) string
 }
 
 // NewBaseDatabase creates new BaseDatabase

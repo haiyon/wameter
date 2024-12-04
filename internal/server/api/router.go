@@ -90,6 +90,9 @@ func (r *Router) setupAPIV1(svc *service.Service) {
 
 	// Register routes
 	api.RegisterRoutes(v1Router)
+
+	// Health check
+	v1Router.GET("/health", r.healthCheck)
 }
 
 // healthCheck serves the health check endpoint

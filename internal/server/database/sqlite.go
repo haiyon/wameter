@@ -73,7 +73,12 @@ func (s *SQLiteDatabase) initSchema() error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+
+	defer func(tx *sql.Tx) {
+		if err := tx.Rollback(); err != nil {
+			s.logger.Error("failed to rollback transaction", zap.Error(err))
+		}
+	}(tx)
 
 	for _, q := range queries {
 		if _, err := tx.Exec(q); err != nil {
@@ -270,7 +275,12 @@ func (s *SQLiteDatabase) Cleanup(ctx context.Context, before time.Time) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+
+	defer func(tx *sql.Tx) {
+		if err := tx.Rollback(); err != nil {
+			s.logger.Error("failed to rollback transaction", zap.Error(err))
+		}
+	}(tx)
 
 	// Delete old metrics
 	query := "DELETE FROM metrics WHERE timestamp < ?"
