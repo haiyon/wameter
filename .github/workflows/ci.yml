@@ -131,7 +131,7 @@ jobs:
           context: .
           file: docker/server/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: false
           build-args: |
             TARGETOS=linux
             TARGETARCH=${{ matrix.arch }}
@@ -144,7 +144,7 @@ jobs:
           context: .
           file: docker/agent/Dockerfile
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: false
           build-args: |
             TARGETOS=linux
             TARGETARCH=${{ matrix.arch }}
