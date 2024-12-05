@@ -83,9 +83,7 @@ func (s *MySQLDatabase) initSchema() error {
 	}
 
 	defer func(tx *sql.Tx) {
-		if err := tx.Rollback(); err != nil {
-			s.logger.Error("failed to rollback transaction", zap.Error(err))
-		}
+		_ = tx.Rollback()
 	}(tx)
 
 	for _, q := range queries {
@@ -280,10 +278,9 @@ func (s *MySQLDatabase) Cleanup(ctx context.Context, before time.Time) error {
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
+
 	defer func(tx *sql.Tx) {
-		if err := tx.Rollback(); err != nil {
-			s.logger.Error("failed to rollback transaction", zap.Error(err))
-		}
+		_ = tx.Rollback()
 	}(tx)
 
 	// Delete old metrics in batches to avoid long locks
