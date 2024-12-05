@@ -6,8 +6,11 @@ import (
 	"time"
 )
 
-// NotifyConfig represents the notification configuration
+// NotifyConfig represents notification configuration
 type NotifyConfig struct {
+	Enabled bool `mapstructure:"enabled"`
+
+	// Notification channels
 	Email    EmailConfig    `mapstructure:"email"`
 	Telegram TelegramConfig `mapstructure:"telegram"`
 	Webhook  WebhookConfig  `mapstructure:"webhook"`
@@ -109,46 +112,80 @@ type DiscordConfig struct {
 }
 
 // Validate notification configuration
-func validateNotifyConfig(config *NotifyConfig) error {
-	if config.Email.Enabled {
-		if err := validateEmailConfig(&config.Email); err != nil {
+func (cfg *NotifyConfig) Validate() error {
+	if !cfg.Enabled {
+		return nil
+	}
+
+	// Validate global settings
+	if cfg.RetryAttempts < 0 {
+		return fmt.Errorf("retry_attempts cannot be negative")
+	}
+	if cfg.RetryDelay <= 0 {
+		return fmt.Errorf("retry_delay must be positive")
+	}
+
+	if cfg.Email.Enabled {
+		if err := cfg.Email.Validate(); err != nil {
 			return fmt.Errorf("invalid email config: %w", err)
 		}
 	}
-	if config.Telegram.Enabled {
-		if err := validateTelegramConfig(&config.Telegram); err != nil {
+
+	if cfg.Telegram.Enabled {
+		if err := cfg.Telegram.Validate(); err != nil {
 			return fmt.Errorf("invalid telegram config: %w", err)
 		}
 	}
-	if config.Slack.Enabled {
-		if err := validateSlackConfig(&config.Slack); err != nil {
+
+	if cfg.Slack.Enabled {
+		if err := cfg.Slack.Validate(); err != nil {
 			return fmt.Errorf("invalid slack config: %w", err)
 		}
 	}
-	if config.Webhook.Enabled {
-		if err := validateWebhookConfig(&config.Webhook); err != nil {
+
+	if cfg.Discord.Enabled {
+		if err := cfg.Discord.Validate(); err != nil {
+			return fmt.Errorf("invalid discord config: %w", err)
+		}
+	}
+
+	if cfg.DingTalk.Enabled {
+		if err := cfg.DingTalk.Validate(); err != nil {
+			return fmt.Errorf("invalid dingtalk config: %w", err)
+		}
+	}
+
+	if cfg.WeChat.Enabled {
+		if err := cfg.WeChat.Validate(); err != nil {
+			return fmt.Errorf("invalid wechat config: %w", err)
+		}
+	}
+
+	if cfg.Webhook.Enabled {
+		if err := cfg.Webhook.Validate(); err != nil {
 			return fmt.Errorf("invalid webhook config: %w", err)
 		}
 	}
+
 	return nil
 }
 
-// Validate email configuration
-func validateEmailConfig(config *EmailConfig) error {
-	if config.SMTPServer == "" {
+// Validate validates email configuration
+func (cfg *EmailConfig) Validate() error {
+	if cfg.SMTPServer == "" {
 		return fmt.Errorf("SMTP server is required")
 	}
-	if config.From == "" {
+	if cfg.From == "" {
 		return fmt.Errorf("sender email is required")
 	}
-	if len(config.To) == 0 {
+	if len(cfg.To) == 0 {
 		return fmt.Errorf("at least one recipient is required")
 	}
 
-	if !strings.Contains(config.From, "@") {
-		return fmt.Errorf("invalid sender email address: %s", config.From)
+	if !strings.Contains(cfg.From, "@") {
+		return fmt.Errorf("invalid sender email address: %s", cfg.From)
 	}
-	for _, to := range config.To {
+	for _, to := range cfg.To {
 		if !strings.Contains(to, "@") {
 			return fmt.Errorf("invalid recipient email address: %s", to)
 		}
@@ -156,29 +193,68 @@ func validateEmailConfig(config *EmailConfig) error {
 	return nil
 }
 
-// Validate telegram configuration
-func validateTelegramConfig(config *TelegramConfig) error {
-	if config.BotToken == "" {
+// Validate validates telegram configuration
+func (cfg *TelegramConfig) Validate() error {
+	if cfg.BotToken == "" {
 		return fmt.Errorf("telegram bot token is required")
 	}
-	if len(config.ChatIDs) == 0 {
+	if len(cfg.ChatIDs) == 0 {
 		return fmt.Errorf("at least one chat ID is required")
 	}
 	return nil
 }
 
-// Validate slack configuration
-func validateSlackConfig(config *SlackConfig) error {
-	if config.WebhookURL == "" {
+// Validate validates slack configuration
+func (cfg *SlackConfig) Validate() error {
+	if cfg.WebhookURL == "" {
 		return fmt.Errorf("slack webhook URL is required")
 	}
 	return nil
 }
 
-// Validate webhook configuration
-func validateWebhookConfig(config *WebhookConfig) error {
-	if config.URL == "" {
-		return fmt.Errorf("webhook URL is required")
+// Validate validates discord configuration
+func (cfg *DiscordConfig) Validate() error {
+	if cfg.WebhookURL == "" {
+		return fmt.Errorf("webhook_url is required")
+	}
+	return nil
+}
+
+// Validate validates dingtalk configuration
+func (cfg *DingTalkConfig) Validate() error {
+	if cfg.AccessToken == "" {
+		return fmt.Errorf("access_token is required")
+	}
+	return nil
+}
+
+// Validate validates wechat configuration
+func (cfg *WeChatConfig) Validate() error {
+	if cfg.CorpID == "" {
+		return fmt.Errorf("corp_id is required")
+	}
+	if cfg.AgentID == 0 {
+		return fmt.Errorf("agent_id is required")
+	}
+	if cfg.Secret == "" {
+		return fmt.Errorf("secret is required")
+	}
+	return nil
+}
+
+// Validate validates webhook configuration
+func (cfg *WebhookConfig) Validate() error {
+	if cfg.URL == "" {
+		return fmt.Errorf("url is required")
+	}
+	if cfg.Method == "" {
+		cfg.Method = "POST"
+	}
+	if cfg.Timeout <= 0 {
+		cfg.Timeout = 10 * time.Second
+	}
+	if cfg.MaxRetries < 0 {
+		return fmt.Errorf("max_retries cannot be negative")
 	}
 	return nil
 }

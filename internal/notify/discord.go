@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-	ntpl "wameter/internal/server/notify/template"
-
-	"wameter/internal/server/config"
+	"wameter/internal/config"
+	ntpl "wameter/internal/notify/template"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
@@ -79,72 +78,56 @@ func NewDiscordNotifier(cfg *config.DiscordConfig, loader *ntpl.Loader, logger *
 
 // NotifyAgentOffline sends agent offline notification
 func (d *DiscordNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
-	tmpl, err := d.tplLoader.GetTemplate(ntpl.Discord, "network_error")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
+	// Prepare data
 	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
-
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	var msg DiscordMessage
-	if err := json.Unmarshal(content.Bytes(), &msg); err != nil {
-		return fmt.Errorf("failed to unmarshal message: %w", err)
-	}
-
-	msg.Username = d.config.Username
-	msg.AvatarURL = d.config.AvatarURL
-
-	return d.send(msg)
+	return d.sendTemplate("agent_offline", data)
 }
 
 // NotifyNetworkErrors sends network errors notification
 func (d *DiscordNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
-	tmpl, err := d.tplLoader.GetTemplate(ntpl.Discord, "network_error")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
+	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	var msg DiscordMessage
-	if err := json.Unmarshal(content.Bytes(), &msg); err != nil {
-		return fmt.Errorf("failed to unmarshal message: %w", err)
-	}
-
-	msg.Username = d.config.Username
-	msg.AvatarURL = d.config.AvatarURL
-
-	return d.send(msg)
+	return d.sendTemplate("network_error", data)
 }
 
 // NotifyHighNetworkUtilization sends high network utilization notification
 func (d *DiscordNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
-	tmpl, err := d.tplLoader.GetTemplate(ntpl.Discord, "high_utilization")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
+	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
+	}
+	return d.sendTemplate("high_utilization", data)
+}
+
+// NotifyIPChange sends IP change notification
+func (d *DiscordNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+	data := map[string]any{
+		"Agent":         agent,
+		"Change":        change,
+		"Timestamp":     time.Now(),
+		"IsExternal":    change.IsExternal,
+		"Version":       change.Version,
+		"OldAddrs":      change.OldAddrs,
+		"NewAddrs":      change.NewAddrs,
+		"InterfaceName": change.InterfaceName,
+	}
+	return d.sendTemplate("ip_change", data)
+}
+
+// sendTemplate sends Discord message
+func (d *DiscordNotifier) sendTemplate(templateName string, data map[string]any) error {
+	tmpl, err := d.tplLoader.GetTemplate(ntpl.Discord, templateName)
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
 	}
 
 	var content bytes.Buffer

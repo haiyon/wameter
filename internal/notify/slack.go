@@ -7,9 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-	ntpl "wameter/internal/server/notify/template"
-
-	"wameter/internal/server/config"
+	"wameter/internal/config"
+	ntpl "wameter/internal/notify/template"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
@@ -78,76 +77,56 @@ func NewSlackNotifier(cfg *config.SlackConfig, loader *ntpl.Loader, logger *zap.
 
 // NotifyAgentOffline sends agent offline notification
 func (s *SlackNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
-	tmpl, err := s.tplLoader.GetTemplate(ntpl.Slack, "agent_offline")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
+	// Prepare data
 	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
-
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	var msg SlackMessage
-	if err := json.Unmarshal(content.Bytes(), &msg); err != nil {
-		return fmt.Errorf("failed to unmarshal message: %w", err)
-	}
-
-	msg.Channel = s.config.Channel
-	msg.Username = s.config.Username
-	msg.IconEmoji = s.config.IconEmoji
-	msg.IconURL = s.config.IconURL
-
-	return s.send(msg)
+	return s.sendTemplate("agent_offline", data)
 }
 
 // NotifyNetworkErrors sends a network errors notification
 func (s *SlackNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
-	tmpl, err := s.tplLoader.GetTemplate(ntpl.Slack, "network_error")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
+	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	var msg SlackMessage
-	if err := json.Unmarshal(content.Bytes(), &msg); err != nil {
-		return fmt.Errorf("failed to unmarshal message: %w", err)
-	}
-
-	msg.Channel = s.config.Channel
-	msg.Username = s.config.Username
-	msg.IconEmoji = s.config.IconEmoji
-	msg.IconURL = s.config.IconURL
-
-	return s.send(msg)
+	return s.sendTemplate("network_error", data)
 }
 
 // NotifyHighNetworkUtilization sends a high network utilization notification
 func (s *SlackNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
-	tmpl, err := s.tplLoader.GetTemplate(ntpl.Slack, "high_utilization")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
+	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
+	}
+	return s.sendTemplate("high_utilization", data)
+}
+
+// NotifyIPChange sends IP change notification
+func (s *SlackNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+	data := map[string]any{
+		"Agent":         agent,
+		"Change":        change,
+		"Timestamp":     time.Now(),
+		"IsExternal":    change.IsExternal,
+		"Version":       change.Version,
+		"OldAddrs":      change.OldAddrs,
+		"NewAddrs":      change.NewAddrs,
+		"InterfaceName": change.InterfaceName,
+	}
+	return s.sendTemplate("ip_change", data)
+}
+
+// sendTemplate sends Slack message
+func (s *SlackNotifier) sendTemplate(templateName string, data map[string]any) error {
+	tmpl, err := s.tplLoader.GetTemplate(ntpl.Slack, templateName)
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
 	}
 
 	var content bytes.Buffer

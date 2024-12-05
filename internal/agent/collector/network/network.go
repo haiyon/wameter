@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"wameter/internal/agent/reporter"
+	"wameter/internal/notify"
 	"wameter/internal/version"
 
 	"wameter/internal/agent/config"
@@ -22,24 +24,35 @@ import (
 
 // networkCollector represents a network collector
 type networkCollector struct {
-	config    *config.NetworkConfig
-	agentID   string
-	logger    *zap.Logger
-	stats     *statsCollector
-	stopChan  chan struct{}
-	lastState *types.NetworkState
-	mu        sync.RWMutex
-	client    *http.Client
+	config     *config.NetworkConfig
+	agentID    string
+	logger     *zap.Logger
+	stats      *statsCollector
+	ipTracker  *IPTracker
+	reporter   *reporter.Reporter
+	notifier   *notify.Manager
+	stopChan   chan struct{}
+	lastState  *types.NetworkState
+	mu         sync.RWMutex
+	client     *http.Client
+	standalone bool
 }
 
 // NewCollector creates a new network collector
-func NewCollector(cfg *config.NetworkConfig, agentID string, logger *zap.Logger) *networkCollector {
+func NewCollector(cfg *config.NetworkConfig, agentID string, reporter *reporter.Reporter, notifier *notify.Manager, standalone bool, logger *zap.Logger) *networkCollector {
+	if cfg.IPTracker == nil {
+		cfg.IPTracker = config.IPtrackerDefaultConfig()
+	}
 	return &networkCollector{
-		config:   cfg,
-		agentID:  agentID,
-		logger:   logger,
-		stopChan: make(chan struct{}),
-		stats:    newStatsCollector(cfg, logger),
+		config:     cfg,
+		agentID:    agentID,
+		logger:     logger,
+		stopChan:   make(chan struct{}),
+		ipTracker:  NewIPTracker(cfg.IPTracker, logger),
+		reporter:   reporter,
+		notifier:   notifier,
+		standalone: standalone,
+		stats:      newStatsCollector(cfg, logger),
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 			Transport: &http.Transport{
@@ -77,12 +90,16 @@ func (c *networkCollector) Start(ctx context.Context) error {
 func (c *networkCollector) Stop() error {
 	close(c.stopChan)
 
+	if err := c.stats.Stop(); err != nil {
+		c.logger.Error("Failed to stop stats collector", zap.Error(err))
+	}
+
 	// Cleanup HTTP client resources
 	if transport, ok := c.client.Transport.(*http.Transport); ok {
 		transport.CloseIdleConnections()
 	}
 
-	return c.stats.Stop()
+	return nil
 }
 
 // Collect performs a single collection
@@ -102,7 +119,6 @@ func (c *networkCollector) Collect(ctx context.Context) (*types.MetricsData, err
 		Timestamp:   time.Now(),
 		Interfaces:  make(map[string]*types.InterfaceInfo),
 		CollectedAt: time.Now(),
-		ReportedAt:  time.Now(),
 	}
 
 	// Collect interface information
@@ -137,7 +153,7 @@ func (c *networkCollector) Collect(ctx context.Context) (*types.MetricsData, err
 		Version:     version.GetInfo().Version,
 		Timestamp:   state.Timestamp,
 		CollectedAt: state.CollectedAt,
-		ReportedAt:  state.ReportedAt,
+		ReportedAt:  time.Now(),
 		Metrics: struct {
 			Network *types.NetworkState `json:"network,omitempty"`
 		}{
@@ -152,6 +168,8 @@ func (c *networkCollector) collectInterfaces(state *types.NetworkState) error {
 	if err != nil {
 		return fmt.Errorf("failed to get interfaces: %w", err)
 	}
+
+	ifaceStates := make(map[string]*types.IPState)
 
 	for _, iface := range interfaces {
 		// Skip interfaces based on configuration
@@ -178,21 +196,50 @@ func (c *networkCollector) collectInterfaces(state *types.NetworkState) error {
 			continue
 		}
 
+		ipState := &types.IPState{
+			IPv4Addrs: make([]string, 0),
+			IPv6Addrs: make([]string, 0),
+			UpdatedAt: time.Now(),
+		}
+
 		for _, addr := range addrs {
 			if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ipnet.IP.IsUnspecified() || ipnet.IP.IsMulticast() {
+					continue // Skip invalid IPs
+				}
 				if ip4 := ipnet.IP.To4(); ip4 != nil {
-					info.IPv4 = append(info.IPv4,
-						fmt.Sprintf("%s/%d", ip4.String(),
-							utils.NetworkMaskSize(ipnet.Mask)))
+					addr := fmt.Sprintf("%s/%d", ip4.String(),
+						utils.NetworkMaskSize(ipnet.Mask))
+					info.IPv4 = append(info.IPv4, addr)
+					ipState.IPv4Addrs = append(ipState.IPv4Addrs, addr)
 				} else if ip6 := ipnet.IP.To16(); ip6 != nil {
-					info.IPv6 = append(info.IPv6,
-						fmt.Sprintf("%s/%d", ip6.String(),
-							utils.NetworkMaskSize(ipnet.Mask)))
+					addr := fmt.Sprintf("%s/%d", ip6.String(),
+						utils.NetworkMaskSize(ipnet.Mask))
+					info.IPv6 = append(info.IPv6, addr)
+					ipState.IPv6Addrs = append(ipState.IPv6Addrs, addr)
 				}
 			}
 		}
 
 		state.Interfaces[iface.Name] = info
+		ifaceStates[iface.Name] = ipState
+	}
+
+	// Track IP changes
+	externalIPs := make(map[types.IPVersion]string)
+	if state.ExternalIP != "" {
+		if ip := net.ParseIP(state.ExternalIP); ip != nil {
+			if ip.To4() != nil {
+				externalIPs[types.IPv4] = state.ExternalIP
+			} else {
+				externalIPs[types.IPv6] = state.ExternalIP
+			}
+		}
+	}
+
+	changes := c.ipTracker.Track(ifaceStates, externalIPs)
+	if len(changes) > 0 {
+		c.handleIPChanges(changes)
 	}
 
 	return nil
@@ -330,4 +377,63 @@ func (c *networkCollector) queryExternalProvider(ctx context.Context, provider s
 	}
 
 	return ip, nil
+}
+
+// handleIPChanges handles IP address changes
+func (c *networkCollector) handleIPChanges(changes []types.IPChange) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		c.logger.Error("Failed to get hostname", zap.Error(err))
+		hostname = "unknown"
+	}
+
+	for _, change := range changes {
+		// Log the change
+		c.logger.Info("IP change detected",
+			zap.String("agent_id", c.agentID),
+			zap.String("hostname", hostname),
+			zap.String("interface", change.InterfaceName),
+			zap.String("version", string(change.Version)),
+			zap.Bool("is_external", change.IsExternal))
+
+		// Create agent info for notifications
+		agent := &types.AgentInfo{
+			ID:       c.agentID,
+			Hostname: hostname,
+			Status:   "online",
+		}
+
+		// In standalone mode or if local notifications are enabled, notify directly
+		if c.standalone && c.notifier != nil && c.notifier.IsEnabled() {
+			c.notifier.NotifyIPChange(agent, &change)
+		}
+
+		// If not in standalone mode, include changes in metrics for server notification
+		if !c.standalone {
+			data := &types.MetricsData{
+				AgentID:     c.agentID,
+				Hostname:    hostname,
+				Timestamp:   change.Timestamp,
+				CollectedAt: time.Now(),
+				ReportedAt:  time.Now(),
+				Metrics: struct {
+					Network *types.NetworkState `json:"network,omitempty"`
+				}{
+					Network: &types.NetworkState{
+						AgentID:    c.agentID,
+						Hostname:   hostname,
+						Timestamp:  change.Timestamp,
+						IPChanges:  []types.IPChange{change},
+						Interfaces: make(map[string]*types.InterfaceInfo),
+					},
+				},
+			}
+
+			// Report to server
+			if err := c.reporter.Report(data); err != nil {
+				c.logger.Error("Failed to report IP change",
+					zap.Error(err))
+			}
+		}
+	}
 }

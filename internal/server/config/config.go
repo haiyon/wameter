@@ -3,17 +3,18 @@ package config
 import (
 	"fmt"
 	"time"
+	commonCfg "wameter/internal/config"
 
 	"github.com/spf13/viper"
 )
 
 // Config represents the complete server configuration
 type Config struct {
-	Server   ServerConfig `mapstructure:"server"`
-	Database Database     `mapstructure:"database"`
-	Notify   NotifyConfig `mapstructure:"notify"`
-	API      APIConfig    `mapstructure:"api"`
-	Log      LogConfig    `mapstructure:"log"`
+	Server   ServerConfig            `mapstructure:"server"`
+	Database Database                `mapstructure:"database"`
+	Notify   *commonCfg.NotifyConfig `mapstructure:"notify"`
+	API      APIConfig               `mapstructure:"api"`
+	Log      LogConfig               `mapstructure:"log"`
 }
 
 // ServerConfig represents the server configuration
@@ -134,7 +135,7 @@ func LoadConfig(path string) (*Config, error) {
 	setDefaults(&config)
 
 	// Validate configuration
-	if err := validateConfig(&config); err != nil {
+	if err := config.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
@@ -198,27 +199,27 @@ func setDefaults(config *Config) {
 	}
 }
 
-// validateConfig validates the configuration
-func validateConfig(config *Config) error {
+// Validate validates the configuration
+func (cfg *Config) Validate() error {
 	// Validate database configuration
-	if err := config.Database.Validate(); err != nil {
+	if err := cfg.Database.Validate(); err != nil {
 		return fmt.Errorf("invalid database config: %w", err)
 	}
 
 	// Validate TLS configuration
-	if config.Server.TLS.Enabled {
-		if err := validateTLSConfig(&config.Server.TLS); err != nil {
+	if cfg.Server.TLS.Enabled {
+		if err := cfg.Server.TLS.Validate(); err != nil {
 			return fmt.Errorf("invalid TLS config: %w", err)
 		}
 	}
 
 	// Validate notification configuration
-	if err := validateNotifyConfig(&config.Notify); err != nil {
+	if err := cfg.Notify.Validate(); err != nil {
 		return fmt.Errorf("invalid notification config: %w", err)
 	}
 
 	// Validate API configuration
-	if err := validateAPIConfig(&config.API); err != nil {
+	if err := cfg.API.Validate(); err != nil {
 		return fmt.Errorf("invalid API config: %w", err)
 	}
 
@@ -226,17 +227,17 @@ func validateConfig(config *Config) error {
 }
 
 // Validate TLS configuration
-func validateTLSConfig(config *TLSConfig) error {
-	if config.CertFile == "" || config.KeyFile == "" {
+func (cfg *TLSConfig) Validate() error {
+	if cfg.CertFile == "" || cfg.KeyFile == "" {
 		return fmt.Errorf("TLS cert and key files are required")
 	}
 	return nil
 }
 
 // Validate API configuration
-func validateAPIConfig(config *APIConfig) error {
-	if config.Auth.Enabled {
-		if err := validateAuthConfig(&config.Auth); err != nil {
+func (cfg *APIConfig) Validate() error {
+	if cfg.Auth.Enabled {
+		if err := cfg.Auth.Validate(); err != nil {
 			return fmt.Errorf("invalid auth config: %w", err)
 		}
 	}
@@ -244,18 +245,18 @@ func validateAPIConfig(config *APIConfig) error {
 }
 
 // Validate auth configuration
-func validateAuthConfig(config *AuthConfig) error {
-	switch config.Type {
+func (cfg *AuthConfig) Validate() error {
+	switch cfg.Type {
 	case "jwt":
-		if config.JWTSecret == "" {
+		if cfg.JWTSecret == "" {
 			return fmt.Errorf("JWT secret is required")
 		}
 	case "apikey", "basic":
-		if len(config.AllowedUsers) == 0 {
+		if len(cfg.AllowedUsers) == 0 {
 			return fmt.Errorf("allowed users list is required")
 		}
 	default:
-		return fmt.Errorf("unsupported auth type: %s", config.Type)
+		return fmt.Errorf("unsupported auth type: %s", cfg.Type)
 	}
 	return nil
 }

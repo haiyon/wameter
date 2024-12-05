@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	"wameter/internal/server/notify/template"
-
-	"wameter/internal/server/config"
+	"wameter/internal/config"
+	"wameter/internal/notify/template"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
@@ -23,13 +22,22 @@ const (
 	NotifierWeChat   NotifierType = "wechat"
 	NotifierDingTalk NotifierType = "dingtalk"
 	NotifierDiscord  NotifierType = "discord"
+	NotifierWebhook  NotifierType = "webhook"
 )
 
 // Notifier represents notifier interface
 type Notifier interface {
+	// NotifyAgentOffline sends agent offline notification
 	NotifyAgentOffline(agent *types.AgentInfo) error
+
+	// NotifyNetworkErrors sends network errors notification
 	NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error
+
+	// NotifyHighNetworkUtilization sends high network utilization notification
 	NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error
+
+	// NotifyIPChange sends IP change notification
+	NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error
 }
 
 // notification represents a notification to be sent
@@ -88,7 +96,7 @@ func (r *RateLimiter) AllowNotification(notifierType NotifierType) bool {
 }
 
 // NewManager creates new notifier manager
-func NewManager(cfg config.NotifyConfig, logger *zap.Logger) (*Manager, error) {
+func NewManager(cfg *config.NotifyConfig, logger *zap.Logger) (*Manager, error) {
 	tplLoader, err := template.NewLoader(logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize template loader: %w", err)
@@ -97,7 +105,7 @@ func NewManager(cfg config.NotifyConfig, logger *zap.Logger) (*Manager, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	m := &Manager{
-		config:    &cfg,
+		config:    cfg,
 		logger:    logger,
 		notifiers: make(map[NotifierType]Notifier),
 		tplLoader: tplLoader,
@@ -160,6 +168,14 @@ func NewManager(cfg config.NotifyConfig, logger *zap.Logger) (*Manager, error) {
 		}
 	}
 
+	if cfg.Webhook.Enabled {
+		if n, err := NewWebhookNotifier(&cfg.Webhook, m.tplLoader, logger); err == nil {
+			m.notifiers[NotifierWebhook] = n
+		} else {
+			logger.Error("Failed to initialize webhook notifier", zap.Error(err))
+		}
+	}
+
 	// Start notification processor
 	m.wg.Add(1)
 	go m.processNotifications()
@@ -204,7 +220,7 @@ func (m *Manager) NotifyAgentOffline(agent *types.AgentInfo) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	for t, _ := range m.notifiers {
+	for t := range m.notifiers {
 		notifyType := t // Capture for closure
 		m.notifyChan <- notification{
 			notifierType: notifyType,
@@ -220,7 +236,7 @@ func (m *Manager) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	for t, _ := range m.notifiers {
+	for t := range m.notifiers {
 		notifyType := t // Capture for closure
 		m.notifyChan <- notification{
 			notifierType: notifyType,
@@ -236,12 +252,28 @@ func (m *Manager) NotifyHighNetworkUtilization(agentID string, iface *types.Inte
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	for t, _ := range m.notifiers {
+	for t := range m.notifiers {
 		notifyType := t // Capture for closure
 		m.notifyChan <- notification{
 			notifierType: notifyType,
 			notifyFunc: func(n Notifier) error {
 				return n.NotifyHighNetworkUtilization(agentID, iface)
+			},
+		}
+	}
+}
+
+// NotifyIPChange sends an IP change notification
+func (m *Manager) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for t := range m.notifiers {
+		notifyType := t
+		m.notifyChan <- notification{
+			notifierType: notifyType,
+			notifyFunc: func(n Notifier) error {
+				return n.NotifyIPChange(agent, change)
 			},
 		}
 	}
@@ -264,4 +296,19 @@ func (m *Manager) Stop() error {
 	case <-time.After(30 * time.Second):
 		return fmt.Errorf("timeout waiting for notifications to complete")
 	}
+}
+
+// IsEnabled checks if a notifier is enabled
+func (m *Manager) IsEnabled() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.config.Enabled
+}
+
+// IsNotifierEnabled checks if a notifier is enabled
+func (m *Manager) IsNotifierEnabled(notifierType NotifierType) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	_, ok := m.notifiers[notifierType]
+	return ok
 }

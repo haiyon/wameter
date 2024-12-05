@@ -2,12 +2,46 @@ package types
 
 import (
 	"encoding/json"
+	"net"
 	"time"
 
 	"wameter/internal/validator"
 )
 
 var validate = validator.New()
+
+// IPVersion represents IP version type
+type IPVersion string
+
+const (
+	IPv4 IPVersion = "ipv4"
+	IPv6 IPVersion = "ipv6"
+)
+
+// IPChange represents a detected IP address change
+type IPChange struct {
+	InterfaceName string    `json:"interface_name,omitempty"`
+	Version       IPVersion `json:"version"`
+	OldAddrs      []string  `json:"old_addrs"`
+	NewAddrs      []string  `json:"new_addrs"`
+	IsExternal    bool      `json:"is_external"`
+	Timestamp     time.Time `json:"timestamp"`
+}
+
+// IPAddress represents a parsed IP address
+type IPAddress struct {
+	Address  string
+	Version  IPVersion
+	Network  *net.IPNet
+	Original string
+}
+
+// IPState represents the IP state for an interface
+type IPState struct {
+	IPv4Addrs []string
+	IPv6Addrs []string
+	UpdatedAt time.Time
+}
 
 // NetworkState represents the current state of network interfaces
 type NetworkState struct {
@@ -18,6 +52,7 @@ type NetworkState struct {
 	ExternalIP  string                    `json:"external_ip,omitempty" validate:"omitempty,ip"`
 	CollectedAt time.Time                 `json:"collected_at" validate:"required"`
 	ReportedAt  time.Time                 `json:"reported_at" validate:"required"`
+	IPChanges   []IPChange                `json:"ip_changes,omitempty"`
 }
 
 // Validate performs validation of NetworkState

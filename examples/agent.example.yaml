@@ -1,10 +1,11 @@
 # Wameter Agent Configuration Example
 agent:
-  id: ""
-  hostname: ""
-  port: 8081
-
-  # Server connection settings
+  id: ""  # Required, unique agent identifier
+  hostname: "" # Optional, defaults to system hostname
+  port: 8081  # Agent API port for commands
+  # Standalone mode config
+  standalone: false # Set to true to run without server
+  # Server connection settings (required if not standalone)
   server:
     address: "http://localhost:8080"
     timeout: 30s
@@ -14,8 +15,7 @@ agent:
       cert_file: "/etc/wameter/client.crt"
       key_file: "/etc/wameter/client.key"
       ca_file: "/etc/wameter/ca.crt"
-      # Skip TLS verification (not recommended for production)
-      insecure_skip_verify: false
+      insecure_skip_verify: false # Don't use in production
 
 # Collector settings
 collector:
@@ -25,11 +25,13 @@ collector:
   # Network collector settings
   network:
     enabled: true
-    interfaces: [ "eth0" ]
+    interfaces: [ "eth0", "en0", "wlan0" ] # Empty means all interfaces
     exclude_patterns:
       - "docker*"
       - "veth*"
       - "br-*"
+      - "virbr*"
+      - "lo"
     include_virtual: false
     check_external_ip: true
     stat_interval: 10s
@@ -37,22 +39,6 @@ collector:
       - "https://api.ipify.org"
       - "https://ifconfig.me/ip"
       - "https://icanhazip.com"
-    ip_version:
-      enable_ipv4: true
-      enable_ipv6: true
-      prefer_ipv6: false
-    filters:
-      - type: "interface"
-        name: "physical_only"
-        enabled: true
-        rules:
-          virtual: "false"
-          loopback: "false"
-      - type: "bandwidth"
-        name: "high_bandwidth"
-        enabled: true
-        rules:
-          min_speed: "1000"  # Mbps
     stat_collection:
       enabled: true
       interval: 10
@@ -63,34 +49,104 @@ collector:
         - "tx_packets"
         - "rx_errors"
         - "tx_errors"
+        - "rx_dropped"
+        - "tx_dropped"
+    # IP tracking configuration
+    ip_tracking:
+      enable_ipv4: true
+      enable_ipv6: true
+      cleanup_interval: 1h
+      retention_period: 24h
+      change_threshold: 10    # Max changes in window
+      threshold_window: 1h    # Time window for changes
+      external_check_ttl: 5m  # External IP check frequency
 
-  # Metrics collection settings
-  metrics:
+# Notification configuration (used in standalone mode)
+notify:
+  enabled: false # Set to true to enable notifications in standalone mode
+  # Global notification settings
+  retry_attempts: 3
+  retry_delay: 5s
+  max_batch_size: 100
+  rate_limit:
     enabled: true
-    interval: 60s
-    buffer_size: 1000
-    batch_size: 100
-    tags:
+    interval: 1m
+    max_events: 60
+    per_channel: true
+
+  # Email notifications
+  email:
+    enabled: false
+    smtp_server: "smtp.example.com"
+    smtp_port: 587
+    username: "notifications@example.com"
+    password: ""
+    from: "wameter@example.com"
+    to: [ "admin@example.com" ]
+    use_tls: true
+
+  # Telegram notifications
+  telegram:
+    enabled: false
+    bot_token: ""
+    chat_ids: [ "-100123456789" ]  # Group/Channel IDs
+    format: "markdown"  # text, html, markdown
+
+  # Slack notifications
+  slack:
+    enabled: false
+    webhook_url: ""
+    channel: "#monitoring"
+    username: "Wameter Bot"
+    icon_emoji: ":chart_with_upwards_trend:"
+    icon_url: ""
+
+  # Discord notifications
+  discord:
+    enabled: false
+    webhook_url: ""
+    username: "Wameter Bot"
+    avatar_url: ""
+
+  # DingTalk notifications
+  dingtalk:
+    enabled: false
+    access_token: ""
+    secret: ""      for signature
+    at_mobiles: [ ]
+    at_user_ids: [ ]
+    at_all: false
+
+  # WeChat Work notifications
+  wechat:
+    enabled: false
+    corp_id: ""
+    agent_id: 0
+    secret: ""
+    to_user: "@all"
+    to_party: ""
+    to_tag: ""
+
+  # Webhook notifications
+  webhook:
+    enabled: false
+    url: "https://hooks.example.com/wameter"
+    method: "POST"  # Default: POST
+    secret: ""      # Optional: for signature
+    timeout: 10s    # Default: 10s
+    max_retries: 3  # Default: 3
+    headers: # Optional: custom headers
+      X-Custom-Header: "value"
+    common_data: # Optional: data added to all webhooks
       environment: "production"
-      role: "server"
-      location: "datacenter"
 
 # Logging configuration
 log:
-  level: "info"
-  format: "json"
+  level: "info"  # debug, info, warn, error
+  format: "json" # json, console
   file: "/var/log/wameter/agent.log"
-  max_size: 100    # Maximum size in MB before rotation
+  max_size: 100    # Maximum size in MB
   max_backups: 7   # Maximum number of old log files
-  max_age: 30      # Maximum number of days to retain logs
+  max_age: 30      # Maximum days to retain
   compress: true   # Compress rotated logs
-  color: true
-
-# Handler settings for receiving commands
-handler:
-  enabled: true
-  port: 8082
-  allowed_commands:
-    - "config_reload"
-    - "collector_restart"
-    - "update_agent"
+  color: true      # Enable colored output for console format

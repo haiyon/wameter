@@ -1,0 +1,42 @@
+{
+  "attachments": [
+    {
+      "color": "warning",
+      "title": "IP Address Change Detected",
+      "fields": [
+        {
+          "title": "Agent ID",
+          "value": "{{.Agent.ID}}",
+          "short": true
+        },
+        {
+          "title": "Hostname",
+          "value": "{{.Agent.Hostname}}",
+          "short": true
+        },
+        {
+          "title": "Type",
+          "value": "{{if .Change.IsExternal}}External IP{{else}}Interface IP{{end}}",
+          "short": true
+        },
+        {
+          "title": "{{if .Change.IsExternal}}IP Version{{else}}Interface{{end}}",
+          "value": "{{if .Change.IsExternal}}{{.Change.Version}}{{else}}{{.Change.InterfaceName}}{{end}}",
+          "short": true
+        },
+        {
+          "title": "Old IPs",
+          "value": "{{join .Change.OldAddrs '\n'}}",
+          "short": true
+        },
+        {
+          "title": "New IPs",
+          "value": "{{join .Change.NewAddrs '\n'}}",
+          "short": true
+        }
+      ],
+      "footer": "Wameter Monitoring",
+      "ts": "{{.Change.Timestamp.Unix}}"
+    }
+  ]
+}

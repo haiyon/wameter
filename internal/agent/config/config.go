@@ -12,17 +12,19 @@ import (
 
 // Config represents agent configuration
 type Config struct {
-	Agent     AgentConfig     `mapstructure:"agent"`
-	Collector CollectorConfig `mapstructure:"collector"`
-	Log       LogConfig       `mapstructure:"log"`
+	Agent     AgentConfig             `mapstructure:"agent"`
+	Collector CollectorConfig         `mapstructure:"collector"`
+	Notify    *commonCfg.NotifyConfig `mapstructure:"notify"`
+	Log       LogConfig               `mapstructure:"log"`
 }
 
 // AgentConfig represents agent configuration
 type AgentConfig struct {
-	ID       string       `mapstructure:"id"`
-	Hostname string       `mapstructure:"hostname"`
-	Port     int          `mapstructure:"port"`
-	Server   ServerConfig `mapstructure:"server"`
+	ID         string       `mapstructure:"id"`
+	Hostname   string       `mapstructure:"hostname"`
+	Port       int          `mapstructure:"port"`
+	Server     ServerConfig `mapstructure:"server"`
+	Standalone bool         `mapstructure:"standalone"`
 }
 
 // ServerConfig represents server configuration
@@ -51,13 +53,14 @@ type CollectorConfig struct {
 
 // NetworkConfig represents network configuration
 type NetworkConfig struct {
-	Enabled           bool          `mapstructure:"enabled"`
-	Interfaces        []string      `mapstructure:"interfaces"`
-	ExcludePatterns   []string      `mapstructure:"exclude_patterns"`
-	IncludeVirtual    bool          `mapstructure:"include_virtual"`
-	CheckExternalIP   bool          `mapstructure:"check_external_ip"`
-	StatInterval      time.Duration `mapstructure:"stat_interval"`
-	ExternalProviders []string      `mapstructure:"external_providers"`
+	Enabled           bool             `mapstructure:"enabled"`
+	Interfaces        []string         `mapstructure:"interfaces"`
+	ExcludePatterns   []string         `mapstructure:"exclude_patterns"`
+	IncludeVirtual    bool             `mapstructure:"include_virtual"`
+	CheckExternalIP   bool             `mapstructure:"check_external_ip"`
+	StatInterval      time.Duration    `mapstructure:"stat_interval"`
+	ExternalProviders []string         `mapstructure:"external_providers"`
+	IPTracker         *IPTrackerConfig `mapstructure:"ip_tracking"`
 }
 
 // MetricsConfig represents metrics configuration
@@ -72,6 +75,30 @@ type FilterConfig struct {
 	Name    string            `mapstructure:"name"`
 	Enabled bool              `mapstructure:"enabled"`
 	Rules   map[string]string `mapstructure:"rules"`
+}
+
+// IPTrackerConfig represents IP tracking configuration
+type IPTrackerConfig struct {
+	EnableIPv4       bool          `json:"enable_ipv4"`
+	EnableIPv6       bool          `json:"enable_ipv6"`
+	CleanupInterval  time.Duration `json:"cleanup_interval"`
+	RetentionPeriod  time.Duration `json:"retention_period"`
+	ChangeThreshold  int           `json:"change_threshold"`   // Max changes in window
+	ThresholdWindow  time.Duration `json:"threshold_window"`   // Time window for changes
+	ExternalCheckTTL time.Duration `json:"external_check_ttl"` // External IP check frequency
+}
+
+// IPtrackerDefaultConfig returns the default IP tracker configuration
+func IPtrackerDefaultConfig() *IPTrackerConfig {
+	return &IPTrackerConfig{
+		EnableIPv4:       true,
+		EnableIPv6:       true,
+		CleanupInterval:  1 * time.Hour,
+		RetentionPeriod:  24 * time.Hour,
+		ChangeThreshold:  10,
+		ThresholdWindow:  1 * time.Hour,
+		ExternalCheckTTL: 5 * time.Minute,
+	}
 }
 
 // LogConfig represents logging configuration
@@ -107,10 +134,10 @@ func LoadConfig(path string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigFile(path)
 	// Add search paths
-	v.AddConfigPath(".")
-	v.AddConfigPath("$HOME/.config/" + commonCfg.AppName)
-	v.AddConfigPath("$HOME/." + commonCfg.AppName)
-	v.AddConfigPath("/etc/" + commonCfg.AppName)
+	v.AddConfigPath(commonCfg.InDot)
+	v.AddConfigPath(commonCfg.InHome)
+	v.AddConfigPath(commonCfg.InHomeDot)
+	v.AddConfigPath(commonCfg.InEtc)
 	// Add current working directory
 	ex, err := os.Executable()
 	if err != nil {
@@ -193,12 +220,10 @@ func validateConfig(config *Config) error {
 		return fmt.Errorf("agent.id is required")
 	}
 
-	if config.Agent.Server.Address == "" {
-		return fmt.Errorf("server address is required")
-	}
-
-	if config.Agent.Server.Address == "" {
-		return fmt.Errorf("server address is required")
+	if !config.Agent.Standalone {
+		if config.Agent.Server.Address == "" {
+			return fmt.Errorf("server address is required when not in standalone mode")
+		}
 	}
 
 	if config.Agent.Server.TLS.Enabled {
@@ -209,6 +234,12 @@ func validateConfig(config *Config) error {
 
 	if config.Collector.Network.Enabled && len(config.Collector.Network.Interfaces) == 0 {
 		return fmt.Errorf("at least one interface must be specified when network collector is enabled")
+	}
+
+	if config.Agent.Standalone && config.Notify.Enabled {
+		if err := config.Notify.Validate(); err != nil {
+			return fmt.Errorf("invalid notification config: %w", err)
+		}
 	}
 
 	return nil
