@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"sync"
 	"time"
+	"wameter/internal/notify"
 
 	"wameter/internal/server/config"
 	"wameter/internal/server/database"
-	"wameter/internal/server/notify"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
@@ -59,6 +59,11 @@ func NewService(cfg *config.Config, store database.Database, logger *zap.Logger)
 func (s *Service) SaveMetrics(ctx context.Context, data *types.MetricsData) error {
 	// Update agent status
 	s.updateAgentStatus(data, types.AgentStatusOnline)
+
+	// Process IP changes if any
+	if data.Metrics.Network != nil && len(data.Metrics.Network.IPChanges) > 0 {
+		s.processIPChanges(data)
+	}
 
 	// Save metrics
 	if err := s.database.SaveMetrics(ctx, data); err != nil {
@@ -307,6 +312,25 @@ func (s *Service) updateAgentStatus(data *types.MetricsData, status types.AgentS
 					zap.String("agent_id", data.AgentID))
 			}
 		}(agentCopy)
+	}
+}
+
+// processIPChanges handles IP changes and sends notifications
+func (s *Service) processIPChanges(data *types.MetricsData) {
+	s.agentsMu.RLock()
+	agent, exists := s.agents[data.AgentID]
+	s.agentsMu.RUnlock()
+
+	if !exists {
+		s.logger.Error("Failed to process IP changes: agent not found",
+			zap.String("agent_id", data.AgentID))
+		return
+	}
+
+	for _, change := range data.Metrics.Network.IPChanges {
+		if change.NewAddrs != nil && change.OldAddrs != nil {
+			s.notifier.NotifyIPChange(agent, &change)
+		}
 	}
 }
 

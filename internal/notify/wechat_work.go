@@ -7,9 +7,8 @@ import (
 	"net/http"
 	"sync"
 	"time"
-	ntpl "wameter/internal/server/notify/template"
-
-	"wameter/internal/server/config"
+	"wameter/internal/config"
+	ntpl "wameter/internal/notify/template"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
@@ -115,73 +114,74 @@ func (w *WeChatNotifier) refreshToken() error {
 
 // NotifyAgentOffline sends agent offline notification
 func (w *WeChatNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
-	// Get template
-	tmpl, err := w.tplLoader.GetTemplate(ntpl.WeChat, "agent_offline")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
 	// Prepare data
 	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
-
-	// Execute template
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	return w.sendMarkdown(content.String())
+	return w.sendTemplate("agent_offline", data, "markdown")
 }
 
 // NotifyNetworkErrors sends network errors notification
 func (w *WeChatNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
-	// Get template
-	tmpl, err := w.tplLoader.GetTemplate(ntpl.WeChat, "network_error")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-
-	// Execute template
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	return w.sendMarkdown(content.String())
+	return w.sendTemplate("network_error", data, "markdown")
 }
 
 // NotifyHighNetworkUtilization sends high network utilization notification
 func (w *WeChatNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
-	// Get template
-	tmpl, err := w.tplLoader.GetTemplate(ntpl.WeChat, "high_utilization")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
+	return w.sendTemplate("high_utilization", data, "markdown")
+}
 
-	// Execute template
+// NotifyIPChange sends IP change notification
+func (w *WeChatNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+	data := map[string]any{
+		"Agent":         agent,
+		"Change":        change,
+		"Timestamp":     time.Now(),
+		"IsExternal":    change.IsExternal,
+		"Version":       change.Version,
+		"OldAddrs":      change.OldAddrs,
+		"NewAddrs":      change.NewAddrs,
+		"InterfaceName": change.InterfaceName,
+	}
+	return w.sendTemplate("ip_change", data, "markdown")
+}
+
+// sendTemplate sends WeChat message
+func (w *WeChatNotifier) sendTemplate(templateName string, data map[string]any, format ...string) error {
+	tmpl, err := w.tplLoader.GetTemplate(ntpl.WeChat, templateName)
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
+	}
+
 	var content bytes.Buffer
 	if err := tmpl.Execute(&content, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	return w.sendMarkdown(content.String())
+	// Get message format, default to markdown
+	// TODO: Add more formats
+	messageFormat := "markdown"
+	if len(format) > 0 {
+		messageFormat = format[0]
+	}
+	if messageFormat == "markdown" {
+		return w.sendMarkdown(content.String())
+	}
+
+	return nil
 }
 
 // sendMarkdown sends a markdown message

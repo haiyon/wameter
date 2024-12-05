@@ -9,12 +9,12 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
-
 	"wameter/internal/agent/collector"
 	"wameter/internal/agent/collector/network"
 	"wameter/internal/agent/config"
 	"wameter/internal/agent/handler"
 	"wameter/internal/agent/reporter"
+	"wameter/internal/notify"
 	"wameter/internal/version"
 
 	"go.uber.org/zap"
@@ -48,25 +48,57 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
-
-	defer func(logger *zap.Logger) {
+	defer func() {
 		_ = logger.Sync()
-	}(logger)
+	}()
 
 	// Create context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize components
+	// Initialize reporter
+	var r *reporter.Reporter
+	if !cfg.Agent.Standalone {
+		r = reporter.NewReporter(cfg, logger)
+		if err := r.Start(ctx); err != nil {
+			logger.Fatal("Failed to start reporter", zap.Error(err))
+		}
+		defer func(r *reporter.Reporter) {
+			_ = r.Stop()
+		}(r)
+	}
+
+	// Initialize notifier
+	var n *notify.Manager
+	if cfg.Agent.Standalone && cfg.Notify.Enabled {
+		n, err = notify.NewManager(cfg.Notify, logger)
+		if err != nil {
+			logger.Error("Failed to initialize notifier", zap.Error(err))
+		} else {
+			defer func(n *notify.Manager) {
+				_ = n.Stop()
+			}(n)
+		}
+	}
+
+	// Initialize collector manager
 	cm := collector.NewManager(cfg, logger)
-	r := reporter.NewReporter(cfg, logger)
-	h := handler.NewHandler(cfg, logger, cm)
 
 	// Register collectors
-	networkCollector := network.NewCollector(&cfg.Collector.Network, cfg.Agent.ID, logger)
+	networkCollector := network.NewCollector(
+		&cfg.Collector.Network,
+		cfg.Agent.ID,
+		r,
+		n,
+		cfg.Agent.Standalone,
+		logger,
+	)
 	if err := cm.RegisterCollector(networkCollector); err != nil {
 		logger.Fatal("Failed to register network collector", zap.Error(err))
 	}
+
+	// Initialize handler
+	h := handler.NewHandler(cfg, logger, cm)
 
 	// Start components
 	components := []struct {
@@ -74,9 +106,8 @@ func main() {
 		start func(context.Context) error
 		stop  func() error
 	}{
-		{"reporter", r.Start, r.Stop},
-		{"handler", h.Start, h.Stop},
 		{"collector", cm.Start, cm.Stop},
+		{"handler", h.Start, h.Stop},
 	}
 
 	for _, c := range components {
@@ -103,8 +134,10 @@ func main() {
 					continue
 				}
 
-				if err := r.Report(data); err != nil {
-					logger.Error("Failed to report metrics", zap.Error(err))
+				if !cfg.Agent.Standalone && r != nil {
+					if err := r.Report(data); err != nil {
+						logger.Error("Failed to report metrics", zap.Error(err))
+					}
 				}
 			}
 		}

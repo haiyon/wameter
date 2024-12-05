@@ -5,12 +5,19 @@ import (
 	"fmt"
 	"sync"
 	"time"
-
 	"wameter/internal/agent/config"
+	"wameter/internal/agent/reporter"
+	"wameter/internal/notify"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
 )
+
+// Reporter defines interface for sending metrics
+type Reporter = reporter.Reporter
+
+// Notifier defines interface for sending notifications
+type Notifier = notify.Notifier
 
 // Collector defines the interface for all collectors
 type Collector interface {

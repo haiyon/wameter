@@ -8,9 +8,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
-	ntpl "wameter/internal/server/notify/template"
-
-	"wameter/internal/server/config"
+	"wameter/internal/config"
+	ntpl "wameter/internal/notify/template"
 	"wameter/internal/types"
 	"wameter/internal/utils"
 
@@ -134,6 +133,48 @@ func (t *TelegramNotifier) NotifyHighNetworkUtilization(agentID string, iface *t
 		fmt.Sprintf("Alert generated at %s", time.Now().Format("2006-01-02 15:04:05")))
 
 	return t.sendToAll(message)
+}
+
+// NotifyIPChange sends IP change notification
+func (t *TelegramNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+	var description string
+	if change.IsExternal {
+		description = fmt.Sprintf(
+			"🌐 *IP Change Detected*\n\n"+
+				"*External IP Change*\n"+
+				"• Agent ID: `%s`\n"+
+				"• Hostname: `%s`\n"+
+				"• IP Version: `%s`\n"+
+				"• Old IP: `%s`\n"+
+				"• New IP: `%s`\n\n"+
+				"_%s_",
+			agent.ID,
+			agent.Hostname,
+			change.Version,
+			strings.Join(change.OldAddrs, ", "),
+			strings.Join(change.NewAddrs, ", "),
+			fmt.Sprintf("Changed at %s", change.Timestamp.Format("2006-01-02 15:04:05")))
+	} else {
+		description = fmt.Sprintf(
+			"🌐 *IP Change Detected*\n\n"+
+				"*Interface IP Change*\n"+
+				"• Agent ID: `%s`\n"+
+				"• Hostname: `%s`\n"+
+				"• Interface: `%s`\n"+
+				"• IP Version: `%s`\n"+
+				"• Old IPs: `%s`\n"+
+				"• New IPs: `%s`\n\n"+
+				"_%s_",
+			agent.ID,
+			agent.Hostname,
+			change.InterfaceName,
+			change.Version,
+			strings.Join(change.OldAddrs, ", "),
+			strings.Join(change.NewAddrs, ", "),
+			fmt.Sprintf("Changed at %s", change.Timestamp.Format("2006-01-02 15:04:05")))
+	}
+
+	return t.sendToAll(description)
 }
 
 // sendToAll sends message to all chat IDs

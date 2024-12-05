@@ -10,9 +10,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
-	ntpl "wameter/internal/server/notify/template"
-
-	"wameter/internal/server/config"
+	"wameter/internal/config"
+	ntpl "wameter/internal/notify/template"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
@@ -68,72 +67,64 @@ func NewDingTalkNotifier(cfg *config.DingTalkConfig, loader *ntpl.Loader, logger
 
 // NotifyAgentOffline sends agent offline notification
 func (d *DingTalkNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
-	// Get template
-	tmpl, err := d.tplLoader.GetTemplate(ntpl.DingTalk, "agent_offline")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
 	// Prepare data
 	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
-
-	// Execute template
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	return d.send("Agent Offline Alert", content.String())
+	return d.sendTemplate("agent_offline", data, "Agent Offline Alert")
 }
 
 // NotifyNetworkErrors sends network errors notification
 func (d *DingTalkNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
-	// Get template
-	tmpl, err := d.tplLoader.GetTemplate(ntpl.DingTalk, "agent_offline")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-
-	// Execute template
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-	return d.send("Network Errors Alert", content.String())
+	return d.sendTemplate("network_error", data, "Network Errors Alert")
 }
 
 // NotifyHighNetworkUtilization sends high network utilization notification
 func (d *DingTalkNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
-	// Get template
-	tmpl, err := d.tplLoader.GetTemplate(ntpl.DingTalk, "high_utilization")
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
+	return d.sendTemplate("high_utilization", data, "High Network Utilization Alert")
+}
 
-	// Execute template
+// NotifyIPChange sends IP change notification
+func (d *DingTalkNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+	data := map[string]any{
+		"Agent":         agent,
+		"Change":        change,
+		"Timestamp":     time.Now(),
+		"IsExternal":    change.IsExternal,
+		"Version":       change.Version,
+		"OldAddrs":      change.OldAddrs,
+		"NewAddrs":      change.NewAddrs,
+		"InterfaceName": change.InterfaceName,
+	}
+	return d.sendTemplate("ip_change", data, "markdown")
+}
+
+// sendTemplate sends DingTalk message
+func (d *DingTalkNotifier) sendTemplate(templateName string, data map[string]any, title string) error {
+	tmpl, err := d.tplLoader.GetTemplate(ntpl.DingTalk, templateName)
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
+	}
+
 	var content bytes.Buffer
 	if err := tmpl.Execute(&content, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	return d.send("High Network Utilization", content.String())
+	return d.send(title, content.String())
 }
 
 // send sends DingTalk message

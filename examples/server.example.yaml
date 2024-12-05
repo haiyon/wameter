@@ -18,18 +18,24 @@ server:
 # Database configuration
 database:
   driver: "sqlite"  # sqlite, mysql, postgres
-  # DSN can be a file path/connection string, e.g.
+  # DSN examples:
   # SQLite: "/var/lib/wameter/data.db"
-  # MySQL: "wameter:secret@tcp(127.0.0.1:3306)/wameter?charset=utf8mb4&parseTime=True&loc=Local"
-  # PostgreSQL: "host=localhost user=wameter password=secret dbname=wameter sslmode=disable"
+  # MySQL: "wameter:password@tcp(localhost:3306)/wameter?charset=utf8mb4&parseTime=True&loc=Local"
+  # PostgreSQL: "host=localhost user=wameter password=password dbname=wameter sslmode=disable"
   dsn: "/var/lib/wameter/data.db"
+  # Connection pool settings
   max_connections: 25
   max_idle_conns: 5
   conn_max_lifetime: 1h
   query_timeout: 30s
+  # Data retention settings
   enable_pruning: true
   metrics_retention: 720h  # 30 days
   prune_interval: 24h
+  # Batch processing settings
+  max_batch_size: 1000
+  max_query_rows: 10000
+  statement_cache: true
 
 # API configuration
 api:
@@ -39,10 +45,10 @@ api:
   auth:
     enabled: true
     type: "jwt"        # jwt, apikey, basic
-    jwt_secret: ""     # Set this in production
+    jwt_secret: ""
     jwt_duration: 24h
     allowed_users: # For apikey/basic auth
-      - "admin:secretpassword"
+      - "admin:password"
 
   # CORS settings
   cors:
@@ -66,26 +72,12 @@ api:
   rate_limit:
     enabled: true
     requests: 60     # Requests per window
-    window: 60s      # Time window
+    window: 60s     # Time window
     strategy: "token" # token, leaky, sliding
-
-  # API documentation
-  docs:
-    enabled: true
-    path: "/docs"
-    title: "Wameter API"
-    version: "v1"
-
-  # Metrics collection
-  metrics:
-    enabled: true
-    path: "/metrics"
-    prometheus: true
-    statsd_addr: "localhost:8125"
-    service_name: "wameter"
 
 # Notification configuration
 notify:
+  enabled: true
   # Global notification settings
   retry_attempts: 3
   retry_delay: 5s
@@ -96,31 +88,29 @@ notify:
     max_events: 60
     per_channel: true
 
+
   # Email notifications
   email:
     enabled: false
     smtp_server: "smtp.example.com"
     smtp_port: 587
     username: "notifications@example.com"
-    password: ""  # Set this in production
+    password: ""
     from: "wameter@example.com"
     to: [ "admin@example.com" ]
     use_tls: true
-    templates: # Optional custom templates
-      agent_offline: "/etc/wameter/templates/email/agent_offline.html"
-      network_error: "/etc/wameter/templates/email/network_error.html"
 
   # Telegram notifications
   telegram:
     enabled: false
-    bot_token: ""  # Set this in production
-    chat_ids: [ "-100123456789" ]
+    bot_token: ""
+    chat_ids: [ "-100123456789" ]  # Group/Channel IDs
     format: "markdown"  # text, html, markdown
 
   # Slack notifications
   slack:
     enabled: false
-    webhook_url: ""  # Set this in production
+    webhook_url: ""
     channel: "#monitoring"
     username: "Wameter Bot"
     icon_emoji: ":chart_with_upwards_trend:"
@@ -129,46 +119,46 @@ notify:
   # Discord notifications
   discord:
     enabled: false
-    webhook_url: ""  # Set this in production
+    webhook_url: ""
     username: "Wameter Bot"
     avatar_url: ""
 
-  # Dingtalk notifications
+  # DingTalk notifications
   dingtalk:
     enabled: false
-    access_token: ""  # Set this in production
-    secret: ""  # Set this in production
-    at_mobiles: [ ]
-    at_user_ids: [ ]
-    at_all: false
+    access_token: ""
+    secret: ""      for signature
+    at_mobiles: [ ]   # Optional: notify specific mobile numbers
+    at_user_ids: [ ]  # Optional: notify specific user IDs
+    at_all: false    # Set to true to notify all members
 
-  # Wechat notifications
+  # WeChat Work notifications
   wechat:
     enabled: false
-    corp_id: ""  # Set this in production
-    agent_id: 0  # Set this in production
-    secret: ""   # Set this in production
-    to_user: "@all"
-    to_party: ""
-    to_tag: ""
+    corp_id: ""
+    agent_id: 0
+    secret: ""
+    to_user: "@all" # "@all" or user IDs separated by |
+    to_party: ""    # Optional: department IDs
+    to_tag: ""      # Optional: tag IDs
 
   # Webhook notifications
   webhook:
     enabled: false
     url: "https://hooks.example.com/wameter"
-    method: "POST"
-    secret: ""  # Set this in production
-    timeout: 10s
-    max_retries: 3
-    headers:
+    method: "POST"  # Default: POST
+    secret: ""      # Optional: for signature
+    timeout: 10s    # Default: 10s
+    max_retries: 3  # Default: 3
+    headers: # Optional: custom headers
       X-Custom-Header: "value"
-    common_data:
+    common_data: # Optional: data added to all webhooks
       environment: "production"
 
 # Logging configuration
 log:
-  level: "info"
-  format: "json"
+  level: "info"  # debug, info, warn, error
+  format: "json" # json, console
   file: "/var/log/wameter/server.log"
   max_size: 100    # MB
   max_backups: 7   # files

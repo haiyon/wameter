@@ -10,9 +10,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-	ntpl "wameter/internal/server/notify/template"
-
-	"wameter/internal/server/config"
+	"wameter/internal/config"
+	ntpl "wameter/internal/notify/template"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
@@ -116,6 +115,27 @@ func (w *WebhookNotifier) NotifyHighNetworkUtilization(agentID string, iface *ty
 				"tx_total":    iface.Statistics.TxBytes,
 				"utilization": calculateUtilization(iface),
 			},
+		},
+	}
+
+	return w.sendWebhook(payload)
+}
+
+// NotifyIPChange sends IP change notification
+func (w *WebhookNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+	payload := WebhookPayload{
+		EventType: "ip.change",
+		EventID:   generateEventID(),
+		Timestamp: time.Now(),
+		AgentID:   agent.ID,
+		Hostname:  agent.Hostname,
+		Data: map[string]any{
+			"is_external":    change.IsExternal,
+			"version":        change.Version,
+			"old_addresses":  change.OldAddrs,
+			"new_addresses":  change.NewAddrs,
+			"interface_name": change.InterfaceName,
+			"changed_at":     change.Timestamp,
 		},
 	}
 

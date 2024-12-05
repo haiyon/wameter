@@ -141,4 +141,14 @@ var templateFuncs = template.FuncMap{
 	"formatDuration": func(d time.Duration) string {
 		return d.Round(time.Second).String()
 	},
+	"join": func(s []string, sep string) string {
+		var result []string
+		for _, v := range s {
+			v = strings.TrimSpace(utils.NormalizeString(v))
+			if v != "" {
+				result = append(result, v)
+			}
+		}
+		return strings.Join(result, sep)
+	},
 }

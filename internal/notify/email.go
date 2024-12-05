@@ -7,9 +7,8 @@ import (
 	"net/smtp"
 	"strings"
 	"time"
-	ntpl "wameter/internal/server/notify/template"
-
-	"wameter/internal/server/config"
+	"wameter/internal/config"
+	ntpl "wameter/internal/notify/template"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
@@ -67,8 +66,34 @@ func (n *EmailNotifier) NotifyHighNetworkUtilization(agentID string, iface *type
 	return n.sendTemplateEmail("high_utilization", data, subject)
 }
 
-// sendEmail sends an email
-func (n *EmailNotifier) sendEmail(subject, content string) error {
+// NotifyIPChange sends IP change notification
+func (n *EmailNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+	data := map[string]any{
+		"Agent":     agent,
+		"Change":    change,
+		"Timestamp": time.Now(),
+	}
+	subject := fmt.Sprintf("IP Change Alert - %s", agent.Hostname)
+	return n.sendTemplateEmail("ip_change", data, subject)
+}
+
+// sendTemplateEmail sends an email
+func (n *EmailNotifier) sendTemplateEmail(templateName string, data map[string]any, subject string) error {
+	tmpl, err := n.tplLoader.GetTemplate(ntpl.Email, templateName)
+	if err != nil {
+		return fmt.Errorf("failed to get template: %w", err)
+	}
+
+	var content bytes.Buffer
+	if err := tmpl.Execute(&content, data); err != nil {
+		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	return n.sendMail(subject, content.String())
+}
+
+// sendMail sends an email
+func (n *EmailNotifier) sendMail(subject, content string) error {
 	auth := smtp.PlainAuth("", n.config.Username, n.config.Password, n.config.SMTPServer)
 
 	msg := buildEmailMessage(n.config.From, n.config.To, subject, content)
@@ -147,21 +172,6 @@ func (n *EmailNotifier) sendTLSEmail(auth smtp.Auth, msg []byte) error {
 		return fmt.Errorf("failed to close message writer: %w", err)
 	}
 	return client.Quit()
-}
-
-// sendTemplateEmail sends an email
-func (n *EmailNotifier) sendTemplateEmail(templateName string, data map[string]any, subject string) error {
-	tmpl, err := n.tplLoader.GetTemplate(ntpl.Email, templateName)
-	if err != nil {
-		return fmt.Errorf("failed to get template: %w", err)
-	}
-
-	var content bytes.Buffer
-	if err := tmpl.Execute(&content, data); err != nil {
-		return fmt.Errorf("failed to execute template: %w", err)
-	}
-
-	return n.sendEmail(subject, content.String())
 }
 
 // buildEmailMessage builds email message
