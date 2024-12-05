@@ -1,45 +1,48 @@
 # Wameter
 
-Wameter is a cross-platform network monitoring tool for tracking interface metrics and IP changes with multi-channel
-notifications. It uses a server-agent architecture and supports multiple storage backends.
+A cross-platform network monitoring and metrics tracking tool designed to handle a wide range of network-related tasks. It utilizes a server-agent architecture, supports multiple storage backends and notification channels, and provides a RESTful API for seamless integration.
 
 ## Features
 
 - Monitor network interfaces and traffic statistics
-- Track external IP changes
-- Multiple notification channels (Email, Slack, Telegram, Discord, etc.)
-- Support multiple databases (SQLite, MySQL, PostgreSQL)
+- Multi-channel notifications (Email, Slack, Telegram, Discord, etc.)
+- Support for multiple databases (SQLite, MySQL, PostgreSQL)
 - RESTful API with OpenAPI documentation
+- Extensible design for future use cases
 
 ## Quick Start
 
-### Install
+### Installation
+
+#### From Source
 
 ```bash
-# From source
 make build
 sudo make install
+```
 
-# Using Docker
+#### Using Docker
+
+```bash
 docker pull ghcr.io/haiyon/wameter
 docker pull ghcr.io/haiyon/wameter-agent
 ```
 
-### Configure
+### Configuration
 
-Create configuration files:
+1. Create configuration files:
 
-```bash
-sudo mkdir -p /etc/wameter
-sudo cp examples/server.example.yaml /etc/wameter/server.yaml
-sudo cp examples/agent.example.yaml /etc/wameter/agent.yaml
-```
+   ```bash
+   sudo mkdir -p /etc/wameter
+   sudo cp examples/server.example.yaml /etc/wameter/server.yaml
+   sudo cp examples/agent.example.yaml /etc/wameter/agent.yaml
+   ```
 
-Edit configurations to match your environment.
+2. Edit configurations to match your environment.
 
-### Run
+### Running
 
-Using systemd:
+#### systemd
 
 ```bash
 # Server
@@ -51,14 +54,7 @@ sudo systemctl enable wameter-agent
 sudo systemctl start wameter-agent
 ```
 
-Using command line:
-
-```bash
-wameter-server -config /etc/wameter/server.yaml
-wameter-agent -config /etc/wameter/agent.yaml
-```
-
-Using Docker:
+#### Docker
 
 ```bash
 # Server
@@ -74,18 +70,37 @@ docker run -d \
   ghcr.io/haiyon/wameter-agent
 ```
 
-## Maintenance
+#### Command Line
 
-Update components:
+```bash
+wameter-server -config /etc/wameter/server.yaml
+wameter-agent -config /etc/wameter/agent.yaml
+```
+
+## Updating
+
+### From Source or Binary
+
+For users who installed Wameter via source or binary packages, use the provided scripts to update components:
 
 ```bash
 ./scripts/update.sh -c [server|agent]
 ```
 
-Uninstall components:
+### Docker
+
+To update Docker-based deployments, pull the latest images and recreate the containers:
 
 ```bash
-./scripts/uninstall.sh -c [server|agent]
+# Pull the latest images
+docker pull ghcr.io/haiyon/wameter
+docker pull ghcr.io/haiyon/wameter-agent
+
+# Recreate containers
+docker stop <container_name>
+docker rm <container_name>
+docker run [options] ghcr.io/haiyon/wameter
+docker run [options] ghcr.io/haiyon/wameter-agent
 ```
 
 ## License
