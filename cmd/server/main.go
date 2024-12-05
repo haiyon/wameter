@@ -48,11 +48,9 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
-	defer func() {
-		if err := logger.Sync(); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
-		}
-	}()
+	defer func(logger *zap.Logger) {
+		_ = logger.Sync()
+	}(logger)
 
 	// Create context with cancellation
 	_, cancel := context.WithCancel(context.Background())

@@ -73,9 +73,7 @@ func (s *PostgresDatabase) initSchema() error {
 	}
 
 	defer func(tx *sql.Tx) {
-		if err := tx.Rollback(); err != nil {
-			s.logger.Error("failed to rollback transaction", zap.Error(err))
-		}
+		_ = tx.Rollback()
 	}(tx)
 
 	for _, q := range queries {
