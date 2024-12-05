@@ -2,8 +2,6 @@ package api
 
 import (
 	"net/http"
-	"time"
-
 	"wameter/internal/server/api/middleware"
 	av1 "wameter/internal/server/api/v1"
 	"wameter/internal/server/config"
@@ -90,15 +88,4 @@ func (r *Router) setupAPIV1(svc *service.Service) {
 
 	// Register routes
 	api.RegisterRoutes(v1Router)
-
-	// Health check
-	v1Router.GET("/health", r.healthCheck)
-}
-
-// healthCheck serves the health check endpoint
-func (r *Router) healthCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"status":    "ok",
-		"timestamp": time.Now(),
-	})
 }
