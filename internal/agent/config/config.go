@@ -168,76 +168,80 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 // setDefaults sets default values if not specified
-func setDefaults(config *Config) {
-	if config.Agent.Hostname == "" {
+func setDefaults(cfg *Config) {
+	if cfg.Agent.Hostname == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
-			hostname = "unknown-" + config.Agent.ID[:8]
+			hostname = "unknown-" + cfg.Agent.ID[:8]
 		}
-		config.Agent.Hostname = hostname
+		cfg.Agent.Hostname = hostname
 	}
 
-	if config.Agent.Port == 0 {
-		config.Agent.Port = 8081
+	if cfg.Agent.ID == "" {
+		cfg.Agent.ID = cfg.Agent.Hostname
 	}
 
-	if config.Collector.Interval == 0 {
-		config.Collector.Interval = 60 * time.Second
+	if cfg.Agent.Port == 0 {
+		cfg.Agent.Port = 8081
 	}
 
-	if config.Agent.Port == 0 {
-		config.Agent.Port = 8081
+	if cfg.Collector.Interval == 0 {
+		cfg.Collector.Interval = 60 * time.Second
 	}
 
-	if config.Agent.Server.Timeout == 0 {
-		config.Agent.Server.Timeout = 30 * time.Second
+	if cfg.Agent.Port == 0 {
+		cfg.Agent.Port = 8081
 	}
 
-	if len(config.Collector.Network.ExternalProviders) == 0 {
-		config.Collector.Network.ExternalProviders = []string{
+	if cfg.Agent.Server.Timeout == 0 {
+		cfg.Agent.Server.Timeout = 30 * time.Second
+	}
+
+	if len(cfg.Collector.Network.ExternalProviders) == 0 {
+		cfg.Collector.Network.ExternalProviders = []string{
 			"https://api.ipify.org",
 			"https://ifconfig.me/ip",
 			"https://icanhazip.com",
 		}
 	}
 
-	if config.Log.MaxSize == 0 {
-		config.Log.MaxSize = 100
+	if cfg.Log.MaxSize == 0 {
+		cfg.Log.MaxSize = 100
 	}
 
-	if config.Log.MaxBackups == 0 {
-		config.Log.MaxBackups = 3
+	if cfg.Log.MaxBackups == 0 {
+		cfg.Log.MaxBackups = 3
 	}
 
-	if config.Log.MaxAge == 0 {
-		config.Log.MaxAge = 28
+	if cfg.Log.MaxAge == 0 {
+		cfg.Log.MaxAge = 28
 	}
 }
 
 // validateConfig validates the configuration
-func validateConfig(config *Config) error {
-	if config.Agent.ID == "" {
+func validateConfig(cfg *Config) error {
+	if cfg.Agent.ID == "" {
 		return fmt.Errorf("agent.id is required")
 	}
 
-	if !config.Agent.Standalone {
-		if config.Agent.Server.Address == "" {
+	if !cfg.Agent.Standalone {
+		if cfg.Agent.Server.Address == "" {
 			return fmt.Errorf("server address is required when not in standalone mode")
 		}
 	}
 
-	if config.Agent.Server.TLS.Enabled {
-		if config.Agent.Server.TLS.CertFile == "" || config.Agent.Server.TLS.KeyFile == "" {
+	if cfg.Agent.Server.TLS.Enabled {
+		if cfg.Agent.Server.TLS.CertFile == "" || cfg.Agent.Server.TLS.KeyFile == "" {
 			return fmt.Errorf("TLS cert and key files are required when TLS is enabled")
 		}
 	}
 
-	if config.Collector.Network.Enabled && len(config.Collector.Network.Interfaces) == 0 {
+	if cfg.Collector.Network.Enabled && len(cfg.Collector.Network.Interfaces) == 0 {
 		return fmt.Errorf("at least one interface must be specified when network collector is enabled")
 	}
 
-	if config.Agent.Standalone && config.Notify.Enabled {
-		if err := config.Notify.Validate(); err != nil {
+	if cfg.Agent.Standalone && cfg.Notify.Enabled {
+		if err := cfg.Notify.Validate(); err != nil {
 			return fmt.Errorf("invalid notification config: %w", err)
 		}
 	}

@@ -143,57 +143,57 @@ func LoadConfig(path string) (*Config, error) {
 }
 
 // setDefaults sets default values for configuration
-func setDefaults(config *Config) {
-	if config.Server.Address == "" {
-		config.Server.Address = ":8080"
+func setDefaults(cfg *Config) {
+	if cfg.Server.Address == "" {
+		cfg.Server.Address = ":8080"
 	}
 
-	if config.Server.MetricsPath == "" {
-		config.Server.MetricsPath = "/metrics"
+	if cfg.Server.MetricsPath == "" {
+		cfg.Server.MetricsPath = "/metrics"
 	}
 
-	if config.Server.ReadTimeout == 0 {
-		config.Server.ReadTimeout = 30 * time.Second
+	if cfg.Server.ReadTimeout == 0 {
+		cfg.Server.ReadTimeout = 30 * time.Second
 	}
 
-	if config.Server.WriteTimeout == 0 {
-		config.Server.WriteTimeout = 30 * time.Second
+	if cfg.Server.WriteTimeout == 0 {
+		cfg.Server.WriteTimeout = 30 * time.Second
 	}
 
-	if config.API.RateLimit.Window == 0 {
-		config.API.RateLimit.Window = time.Minute
+	if cfg.API.RateLimit.Window == 0 {
+		cfg.API.RateLimit.Window = time.Minute
 	}
 
-	if config.API.RateLimit.Requests == 0 {
-		config.API.RateLimit.Requests = 60
+	if cfg.API.RateLimit.Requests == 0 {
+		cfg.API.RateLimit.Requests = 60
 	}
 
-	if config.API.CORS.MaxAge == 0 {
-		config.API.CORS.MaxAge = 86400
+	if cfg.API.CORS.MaxAge == 0 {
+		cfg.API.CORS.MaxAge = 86400
 	}
 
-	if config.Log.MaxSize == 0 {
-		config.Log.MaxSize = 100
+	if cfg.Log.MaxSize == 0 {
+		cfg.Log.MaxSize = 100
 	}
 
-	if config.Log.MaxBackups == 0 {
-		config.Log.MaxBackups = 3
+	if cfg.Log.MaxBackups == 0 {
+		cfg.Log.MaxBackups = 3
 	}
 
-	if config.Log.MaxAge == 0 {
-		config.Log.MaxAge = 28
+	if cfg.Log.MaxAge == 0 {
+		cfg.Log.MaxAge = 28
 	}
 
 	// Set default allowed methods for CORS
-	if len(config.API.CORS.AllowedMethods) == 0 {
-		config.API.CORS.AllowedMethods = []string{
+	if len(cfg.API.CORS.AllowedMethods) == 0 {
+		cfg.API.CORS.AllowedMethods = []string{
 			"GET", "POST", "PUT", "DELETE", "OPTIONS",
 		}
 	}
 
 	// Set default allowed headers for CORS
-	if len(config.API.CORS.AllowedHeaders) == 0 {
-		config.API.CORS.AllowedHeaders = []string{
+	if len(cfg.API.CORS.AllowedHeaders) == 0 {
+		cfg.API.CORS.AllowedHeaders = []string{
 			"Content-Type", "Authorization", "X-Request-ID",
 		}
 	}
