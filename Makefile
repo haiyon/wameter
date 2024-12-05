@@ -72,8 +72,11 @@ dist: build
 			-C $(BIN_DIR)/$(GOOS)_$(GOARCH) \
 			$(call SERVER_BINARY,$(GOOS)) \
 			$(call AGENT_BINARY,$(GOOS)) \
-			-C ../.. \
-			README.md LICENSE examples/; \
+			-C ../../examples \
+			server.example.yaml \
+			agent.example.yaml \
+			-C .. \
+			README.md LICENSE; \
 	else \
 		tar -czf $(DIST_DIR)/$$DIST_NAME.tar.gz \
 			-C $(BIN_DIR)/$(GOOS)_$(GOARCH) \
