@@ -197,8 +197,8 @@ func (m *Manager) StartTime() time.Time {
 	return m.startTime
 }
 
-// getReporter returns the current reporter
-func (m *Manager) getReporter() *reporter.Reporter {
+// GetReporter returns the current reporter
+func (m *Manager) GetReporter() *reporter.Reporter {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.reporter
