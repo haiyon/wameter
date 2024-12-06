@@ -11,4 +11,4 @@ if [ ! -f /app/config/server.yaml ]; then
 fi
 
 # Execute the main process
-exec /app/wameter-server "$@"
+exec /app/wameter "$@"

@@ -24,7 +24,7 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     -X 'wameter/internal/version.GitCommit=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")' \
     -X 'wameter/internal/version.BuildDate=$(date -u "+%Y-%m-%d_%H:%M:%S")' \
     -X 'wameter/internal/version.GoVersion=$(go version | cut -d" " -f3)'" \
-    -o /src/bin/wameter-server \
+    -o /src/bin/wameter \
     ./cmd/server
 
 # Final stage
@@ -38,7 +38,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata
 
 # Copy binary and config
-COPY --from=builder /src/bin/wameter-server /app/
+COPY --from=builder /src/bin/wameter /app/
 COPY --from=builder /src/examples/server.example.yaml /app/config/server.yaml
 COPY docker/server/entrypoint.sh /app/
 

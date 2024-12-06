@@ -158,13 +158,13 @@ uninstall:
 .PHONY: docker-build
 docker-build:
 	@echo "Building Docker images..."
-	docker build -t wameter-server -f docker/server/Dockerfile .
+	docker build -t wameter -f docker/server/Dockerfile .
 	docker build -t wameter-agent -f docker/agent/Dockerfile .
 
 .PHONY: docker-push
 docker-push:
 	@echo "Pushing Docker images..."
-	docker push wameter-server
+	docker push wameter
 	docker push wameter-agent
 
 .PHONY: help
