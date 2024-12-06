@@ -3,21 +3,17 @@ package collector
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"time"
+	"wameter/internal/agent/collector/network"
 	"wameter/internal/agent/config"
+	"wameter/internal/agent/notify"
 	"wameter/internal/agent/reporter"
-	"wameter/internal/notify"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
 )
-
-// Reporter defines interface for sending metrics
-type Reporter = reporter.Reporter
-
-// Notifier defines interface for sending notifications
-type Notifier = notify.Notifier
 
 // Collector defines the interface for all collectors
 type Collector interface {
@@ -33,6 +29,8 @@ type Collector interface {
 
 // Manager manages multiple collectors
 type Manager struct {
+	reporter   *reporter.Reporter
+	notifier   *notify.Manager
 	collectors map[string]Collector
 	config     *config.Config
 	logger     *zap.Logger
@@ -41,8 +39,10 @@ type Manager struct {
 }
 
 // NewManager creates a new collector manager
-func NewManager(cfg *config.Config, logger *zap.Logger) *Manager {
+func NewManager(cfg *config.Config, reporter *reporter.Reporter, notifier *notify.Manager, logger *zap.Logger) *Manager {
 	return &Manager{
+		reporter:   reporter,
+		notifier:   notifier,
 		collectors: make(map[string]Collector),
 		config:     cfg,
 		logger:     logger,
@@ -67,30 +67,76 @@ func (m *Manager) RegisterCollector(c Collector) error {
 
 // Start starts all collectors
 func (m *Manager) Start(ctx context.Context) error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	// Initialize all collectors
+	if err := m.initCollectors(); err != nil {
+		return fmt.Errorf("failed to initialize collectors: %w", err)
+	}
 
+	// Start all collectors
+	m.mu.RLock()
 	for name, collector := range m.collectors {
 		if err := collector.Start(ctx); err != nil {
+			m.mu.RUnlock()
 			return fmt.Errorf("failed to start collector %s: %w", name, err)
 		}
 		m.logger.Info("Started collector", zap.String("name", name))
 	}
+	m.mu.RUnlock()
+
+	// Start collection loop
+	go func() {
+		ticker := time.NewTicker(m.config.Collector.Interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				m.logger.Info("Stopping collection loop")
+				return
+			case <-ticker.C:
+				data, err := m.Collect(ctx)
+				if err != nil {
+					m.logger.Error("Failed to collect metrics", zap.Error(err))
+					continue
+				}
+
+				if data == nil {
+					m.logger.Debug("No data collected")
+					continue
+				}
+
+				// Ensure we have basic data fields
+				if data.Hostname == "" {
+					if hostname, err := os.Hostname(); err == nil {
+						data.Hostname = hostname
+					}
+				}
+
+				data.ReportedAt = time.Now()
+
+				// Send data if we have any
+				if !m.config.Agent.Standalone && m.reporter != nil {
+					if err := m.reporter.Report(data); err != nil {
+						m.logger.Error("Failed to report metrics", zap.Error(err))
+					}
+				}
+			}
+		}
+	}()
 
 	return nil
 }
 
 // Stop stops all collectors
 func (m *Manager) Stop() error {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	var errs []error
 	for name, collector := range m.collectors {
 		if err := collector.Stop(); err != nil {
 			errs = append(errs, fmt.Errorf("failed to stop collector %s: %w", name, err))
 		}
-		m.logger.Info("Stopped collector", zap.String("name", name))
 	}
 
 	if len(errs) > 0 {
@@ -149,4 +195,35 @@ func (m *Manager) Collect(ctx context.Context) (*types.MetricsData, error) {
 // StartTime returns the start time of the collector
 func (m *Manager) StartTime() time.Time {
 	return m.startTime
+}
+
+// getReporter returns the current reporter
+func (m *Manager) getReporter() *reporter.Reporter {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.reporter
+}
+
+// initCollectors initializes all configured collectors
+func (m *Manager) initCollectors() error {
+	// Initialize network collector if enabled
+	if m.config.Collector.Network.Enabled {
+		networkCollector := network.NewCollector(
+			&m.config.Collector.Network,
+			m.config.Agent.ID,
+			m.reporter,
+			m.notifier,
+			m.config.Agent.Standalone,
+			m.logger,
+		)
+
+		if err := m.RegisterCollector(networkCollector); err != nil {
+			return fmt.Errorf("failed to register network collector: %w", err)
+		}
+		m.logger.Info("Network collector registered")
+	}
+
+	// Add other collectors as needed
+
+	return nil
 }

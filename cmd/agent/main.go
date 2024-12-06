@@ -8,13 +8,11 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"time"
 	"wameter/internal/agent/collector"
-	"wameter/internal/agent/collector/network"
 	"wameter/internal/agent/config"
 	"wameter/internal/agent/handler"
+	"wameter/internal/agent/notify"
 	"wameter/internal/agent/reporter"
-	"wameter/internal/notify"
 	"wameter/internal/version"
 
 	"go.uber.org/zap"
@@ -82,20 +80,7 @@ func main() {
 	}
 
 	// Initialize collector manager
-	cm := collector.NewManager(cfg, logger)
-
-	// Register collectors
-	networkCollector := network.NewCollector(
-		&cfg.Collector.Network,
-		cfg.Agent.ID,
-		r,
-		n,
-		cfg.Agent.Standalone,
-		logger,
-	)
-	if err := cm.RegisterCollector(networkCollector); err != nil {
-		logger.Fatal("Failed to register network collector", zap.Error(err))
-	}
+	cm := collector.NewManager(cfg, r, n, logger)
 
 	// Initialize handler
 	h := handler.NewHandler(cfg, logger, cm)
@@ -117,31 +102,6 @@ func main() {
 				zap.Error(err))
 		}
 	}
-
-	// Start collection loop
-	go func() {
-		ticker := time.NewTicker(cfg.Collector.Interval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				data, err := cm.Collect(ctx)
-				if err != nil {
-					logger.Error("Failed to collect metrics", zap.Error(err))
-					continue
-				}
-
-				if !cfg.Agent.Standalone && r != nil {
-					if err := r.Report(data); err != nil {
-						logger.Error("Failed to report metrics", zap.Error(err))
-					}
-				}
-			}
-		}
-	}()
 
 	// Handle signals
 	sigChan := make(chan os.Signal, 1)
