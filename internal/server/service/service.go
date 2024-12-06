@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 	"time"
-	"wameter/internal/notify"
+	"wameter/internal/server/notify"
 
 	"wameter/internal/server/config"
 	"wameter/internal/server/database"

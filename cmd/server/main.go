@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -91,7 +92,7 @@ func main() {
 	go func() {
 		logger.Info("Starting server",
 			zap.String("address", cfg.Server.Address))
-		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			logger.Fatal("Server error", zap.Error(err))
 		}
 	}()

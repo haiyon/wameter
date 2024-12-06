@@ -159,8 +159,7 @@ func (h *Handler) handleUpdateAgent(ctx context.Context, cmd Command) error {
 
 // validateNewConfig validates new configuration
 func validateNewConfig(cfg *config.Config) error {
-	// Add validation logic here
-	return nil
+	return cfg.Validate()
 }
 
 // backupConfig creates backup of the current configuration

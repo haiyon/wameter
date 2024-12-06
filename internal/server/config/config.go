@@ -3,18 +3,18 @@ package config
 import (
 	"fmt"
 	"time"
-	commonCfg "wameter/internal/config"
+	"wameter/internal/config"
 
 	"github.com/spf13/viper"
 )
 
 // Config represents the complete server configuration
 type Config struct {
-	Server   ServerConfig            `mapstructure:"server"`
-	Database Database                `mapstructure:"database"`
-	Notify   *commonCfg.NotifyConfig `mapstructure:"notify"`
-	API      APIConfig               `mapstructure:"api"`
-	Log      LogConfig               `mapstructure:"log"`
+	Server   ServerConfig         `mapstructure:"server"`
+	Database Database             `mapstructure:"database"`
+	Notify   *config.NotifyConfig `mapstructure:"notify"`
+	API      APIConfig            `mapstructure:"api"`
+	Log      LogConfig            `mapstructure:"log"`
 }
 
 // ServerConfig represents the server configuration
@@ -126,20 +126,20 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	var config Config
-	if err := v.Unmarshal(&config); err != nil {
+	var cfg Config
+	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	// Set defaults
-	setDefaults(&config)
+	setDefaults(&cfg)
 
 	// Validate configuration
-	if err := config.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	return &config, nil
+	return &cfg, nil
 }
 
 // setDefaults sets default values for configuration

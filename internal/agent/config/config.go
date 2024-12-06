@@ -5,17 +5,17 @@ import (
 	"os"
 	"path/filepath"
 	"time"
-	commonCfg "wameter/internal/config"
+	"wameter/internal/config"
 
 	"github.com/spf13/viper"
 )
 
 // Config represents agent configuration
 type Config struct {
-	Agent     AgentConfig             `mapstructure:"agent"`
-	Collector CollectorConfig         `mapstructure:"collector"`
-	Notify    *commonCfg.NotifyConfig `mapstructure:"notify"`
-	Log       LogConfig               `mapstructure:"log"`
+	Agent     AgentConfig          `mapstructure:"agent"`
+	Collector CollectorConfig      `mapstructure:"collector"`
+	Notify    *config.NotifyConfig `mapstructure:"notify"`
+	Log       LogConfig            `mapstructure:"log"`
 }
 
 // AgentConfig represents agent configuration
@@ -138,10 +138,10 @@ func LoadConfig(path string) (*Config, error) {
 	v := viper.New()
 	v.SetConfigFile(path)
 	// Add search paths
-	v.AddConfigPath(commonCfg.InDot)
-	v.AddConfigPath(commonCfg.InHome)
-	v.AddConfigPath(commonCfg.InHomeDot)
-	v.AddConfigPath(commonCfg.InEtc)
+	v.AddConfigPath(config.InDot)
+	v.AddConfigPath(config.InHome)
+	v.AddConfigPath(config.InHomeDot)
+	v.AddConfigPath(config.InEtc)
 	// Add current working directory
 	ex, err := os.Executable()
 	if err != nil {
@@ -155,20 +155,20 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	var config Config
-	if err := v.Unmarshal(&config); err != nil {
+	var cfg Config
+	if err := v.Unmarshal(&cfg); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
 
 	// Set defaults if not specified
-	setDefaults(&config)
+	setDefaults(&cfg)
 
 	// Validate configuration
-	if err := validateConfig(&config); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
 
-	return &config, nil
+	return &cfg, nil
 }
 
 // setDefaults sets default values if not specified
@@ -222,8 +222,8 @@ func setDefaults(cfg *Config) {
 	}
 }
 
-// validateConfig validates the configuration
-func validateConfig(cfg *Config) error {
+// Validate validates the configuration
+func (cfg *Config) Validate() error {
 	if cfg.Agent.ID == "" {
 		return fmt.Errorf("agent.id is required")
 	}
