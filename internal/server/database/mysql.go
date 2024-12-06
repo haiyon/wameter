@@ -43,7 +43,7 @@ func NewMySQLDatabase(dsn string, opts Options, logger *zap.Logger) (*MySQLDatab
 	}
 
 	if err := database.initSchema(); err != nil {
-		base.Close()
+		_ = base.Close()
 		return nil, fmt.Errorf("failed to init schema: %w", err)
 	}
 
@@ -53,6 +53,7 @@ func NewMySQLDatabase(dsn string, opts Options, logger *zap.Logger) (*MySQLDatab
 // initSchema creates MySQL tables
 func (s *MySQLDatabase) initSchema() error {
 	queries := []string{
+		// metrics
 		`CREATE TABLE IF NOT EXISTS metrics (
 			id BIGINT AUTO_INCREMENT PRIMARY KEY,
 			agent_id VARCHAR(64) NOT NULL,
@@ -63,7 +64,7 @@ func (s *MySQLDatabase) initSchema() error {
 			created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			INDEX idx_metrics_agent_time (agent_id, timestamp)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
-
+		// agents
 		`CREATE TABLE IF NOT EXISTS agents (
 			id VARCHAR(64) PRIMARY KEY,
 			hostname VARCHAR(255) NOT NULL,
@@ -75,6 +76,24 @@ func (s *MySQLDatabase) initSchema() error {
 			INDEX idx_agents_status (status),
 			INDEX idx_agents_last_seen (last_seen)
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+		// ip changes
+		`
+    CREATE TABLE IF NOT EXISTS ip_changes (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        agent_id VARCHAR(64) NOT NULL,
+        interface_name VARCHAR(64),
+        version VARCHAR(10) NOT NULL,
+        is_external BOOLEAN NOT NULL,
+        old_addrs JSON,
+        new_addrs JSON,
+        action VARCHAR(20) NOT NULL,
+        reason VARCHAR(50) NOT NULL,
+        timestamp DATETIME NOT NULL,
+        created_at DATETIME NOT NULL,
+        INDEX idx_agent_time (agent_id, timestamp),
+        INDEX idx_interface (interface_name),
+        INDEX idx_created_at (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 
 	tx, err := s.db.Begin()
@@ -191,7 +210,9 @@ func (s *MySQLDatabase) GetMetrics(ctx context.Context, query *MetricsQuery, opt
 	if err != nil {
 		return nil, fmt.Errorf("failed to query metrics: %w", err)
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 
 	var results []*types.MetricsData
 	for rows.Next() {
@@ -228,6 +249,36 @@ func (s *MySQLDatabase) GetLatestMetrics(ctx context.Context, agentID string) (*
 		return nil, err
 	}
 	return &data, nil
+}
+
+// SaveIPChange stores an IP change
+func (s *MySQLDatabase) SaveIPChange(ctx context.Context, agentID string, change *types.IPChange) error {
+	oldAddrs, err := json.Marshal(change.OldAddrs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal old addresses: %w", err)
+	}
+
+	newAddrs, err := json.Marshal(change.NewAddrs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal new addresses: %w", err)
+	}
+
+	query := `
+        INSERT INTO ip_changes (
+            agent_id, interface_name, version, is_external,
+            old_addrs, new_addrs, action, reason, timestamp, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+	_, err = s.ExecContext(ctx, query,
+		agentID, change.InterfaceName, change.Version, change.IsExternal,
+		oldAddrs, newAddrs, change.Action, change.Reason,
+		change.Timestamp, time.Now())
+
+	if err != nil {
+		return fmt.Errorf("failed to save IP change: %w", err)
+	}
+
+	return nil
 }
 
 // GetAgent retrieves an agent

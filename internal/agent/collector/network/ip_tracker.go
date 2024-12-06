@@ -88,7 +88,7 @@ func (t *IPTracker) Track(interfaceState map[string]*types.IPState, externalIPs 
 	var changes []types.IPChange
 	now := time.Now()
 
-	// Check if we're in rate limit
+	// Check rate limit
 	if t.isRateLimited() {
 		t.metrics.DroppedChanges++
 		t.logger.Warn("Change tracking rate limited",
@@ -110,6 +110,30 @@ func (t *IPTracker) Track(interfaceState map[string]*types.IPState, externalIPs 
 		// Get or create last state
 		lastState, exists := t.lastState[ifaceName]
 		if !exists {
+			if t.config.NotifyOnFirstSeen {
+				if t.config.EnableIPv4 && len(state.IPv4Addrs) > 0 {
+					changes = append(changes, types.IPChange{
+						InterfaceName: ifaceName,
+						Version:       types.IPv4,
+						OldAddrs:      nil,
+						NewAddrs:      state.IPv4Addrs,
+						Timestamp:     now,
+						Action:        types.IPChangeActionAdd,
+						Reason:        "interface_added",
+					})
+				}
+				if t.config.EnableIPv6 && len(state.IPv6Addrs) > 0 {
+					changes = append(changes, types.IPChange{
+						InterfaceName: ifaceName,
+						Version:       types.IPv6,
+						OldAddrs:      nil,
+						NewAddrs:      state.IPv6Addrs,
+						Timestamp:     now,
+						Action:        types.IPChangeActionAdd,
+						Reason:        "interface_added",
+					})
+				}
+			}
 			t.lastState[ifaceName] = state
 			continue
 		}
@@ -123,6 +147,8 @@ func (t *IPTracker) Track(interfaceState map[string]*types.IPState, externalIPs 
 					OldAddrs:      lastState.IPv4Addrs,
 					NewAddrs:      state.IPv4Addrs,
 					Timestamp:     now,
+					Action:        types.IPChangeActionUpdate,
+					Reason:        "ipv4_changed",
 				})
 				t.metrics.IPv4Changes++
 			}
@@ -137,12 +163,49 @@ func (t *IPTracker) Track(interfaceState map[string]*types.IPState, externalIPs 
 					OldAddrs:      lastState.IPv6Addrs,
 					NewAddrs:      state.IPv6Addrs,
 					Timestamp:     now,
+					Action:        types.IPChangeActionUpdate,
+					Reason:        "ipv6_changed",
 				})
 				t.metrics.IPv6Changes++
 			}
 		}
+	}
 
-		// Update state
+	// Check for removed interfaces
+	if t.config.NotifyOnRemoval {
+		for name, oldState := range t.lastState {
+			if _, exists := interfaceState[name]; !exists {
+				// Interface was removed
+				if t.config.EnableIPv4 && len(oldState.IPv4Addrs) > 0 {
+					changes = append(changes, types.IPChange{
+						InterfaceName: name,
+						Version:       types.IPv4,
+						OldAddrs:      oldState.IPv4Addrs,
+						NewAddrs:      nil,
+						Timestamp:     now,
+						Action:        types.IPChangeActionRemove,
+						Reason:        "interface_removed",
+					})
+				}
+				if t.config.EnableIPv6 && len(oldState.IPv6Addrs) > 0 {
+					changes = append(changes, types.IPChange{
+						InterfaceName: name,
+						Version:       types.IPv6,
+						OldAddrs:      oldState.IPv6Addrs,
+						NewAddrs:      nil,
+						Timestamp:     now,
+						Action:        types.IPChangeActionRemove,
+						Reason:        "interface_removed",
+					})
+				}
+				delete(t.lastState, name)
+				delete(t.lastSeen, name)
+			}
+		}
+	}
+
+	// Update state after processing all changes
+	for ifaceName, state := range interfaceState {
 		t.lastState[ifaceName] = state
 	}
 
@@ -163,16 +226,50 @@ func (t *IPTracker) trackExternalChanges(externalIPs map[types.IPVersion]string,
 	var changes []types.IPChange
 
 	for version, ip := range externalIPs {
-		if lastIP, exists := t.lastExternal[version]; !exists || lastIP != ip {
+		if lastIP, exists := t.lastExternal[version]; !exists {
+			// First time seeing external IP
+			if t.config.NotifyOnFirstSeen {
+				changes = append(changes, types.IPChange{
+					Version:    version,
+					OldAddrs:   nil,
+					NewAddrs:   []string{ip},
+					IsExternal: true,
+					Timestamp:  now,
+					Action:     types.IPChangeActionAdd,
+					Reason:     "external_ip_added",
+				})
+			}
+		} else if lastIP != ip {
+			// External IP changed
 			changes = append(changes, types.IPChange{
 				Version:    version,
 				OldAddrs:   []string{lastIP},
 				NewAddrs:   []string{ip},
 				IsExternal: true,
 				Timestamp:  now,
+				Action:     types.IPChangeActionUpdate,
+				Reason:     "external_ip_changed",
 			})
-			t.lastExternal[version] = ip
 			t.metrics.ExternalChanges++
+		}
+		t.lastExternal[version] = ip
+	}
+
+	// Check for removed external IPs
+	if t.config.NotifyOnRemoval {
+		for version, lastIP := range t.lastExternal {
+			if _, exists := externalIPs[version]; !exists {
+				changes = append(changes, types.IPChange{
+					Version:    version,
+					OldAddrs:   []string{lastIP},
+					NewAddrs:   nil,
+					IsExternal: true,
+					Timestamp:  now,
+					Action:     types.IPChangeActionRemove,
+					Reason:     "external_ip_removed",
+				})
+				delete(t.lastExternal, version)
+			}
 		}
 	}
 

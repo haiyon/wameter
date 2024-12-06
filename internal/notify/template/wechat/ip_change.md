@@ -1,21 +1,22 @@
-// wechat/ip_change.md
 ## IP Address Change Detected
 
-{{if .Change.IsExternal}}
-**External IP Change**
+**{{.Action | toTitle}} - {{.Reason | toTitle}}**
+
+{{if .IsExternal}}
+### External IP Change
 > Agent ID: {{.Agent.ID}}
 > Hostname: {{.Agent.Hostname}}
-> IP Version: {{.Change.Version}}
-> Old IP: {{index .Change.OldAddrs 0}}
-> New IP: {{index .Change.NewAddrs 0}}
+> IP Version: {{.Version}}
+{{if .OldAddrs}}> Old IP: {{index .OldAddrs 0}}{{end}}
+{{if .NewAddrs}}> New IP: {{index .NewAddrs 0}}{{end}}
 {{else}}
-**Interface IP Change**
+### Interface IP Change
 > Agent ID: {{.Agent.ID}}
 > Hostname: {{.Agent.Hostname}}
-> Interface: {{.Change.InterfaceName}}
-> IP Version: {{.Change.Version}}
-> Old IP: {{join .Change.OldAddrs ", "}}
-> New IP: {{join .Change.NewAddrs ", "}}
+> Interface: {{.InterfaceName}}
+> IP Version: {{.Version}}
+{{if .OldAddrs}}> Old IPs: {{join .OldAddrs ", "}}{{end}}
+{{if .NewAddrs}}> New IPs: {{join .NewAddrs ", "}}{{end}}
 {{end}}
 
-_Changed at: {{.Change.Timestamp | formatTime}}_
+_Changed at: {{.Timestamp | formatTime}}_

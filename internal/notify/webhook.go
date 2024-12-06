@@ -130,11 +130,15 @@ func (w *WebhookNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.I
 		AgentID:   agent.ID,
 		Hostname:  agent.Hostname,
 		Data: map[string]any{
+			"agent":          agent.ID,
+			"hostname":       agent.Hostname,
+			"interface_name": change.InterfaceName,
 			"is_external":    change.IsExternal,
 			"version":        change.Version,
-			"old_addresses":  change.OldAddrs,
-			"new_addresses":  change.NewAddrs,
-			"interface_name": change.InterfaceName,
+			"old_addrs":      change.OldAddrs,
+			"new_addrs":      change.NewAddrs,
+			"action":         change.Action,
+			"reason":         change.Reason,
 			"changed_at":     change.Timestamp,
 		},
 	}

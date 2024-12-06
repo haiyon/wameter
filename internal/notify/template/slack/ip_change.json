@@ -1,42 +1,67 @@
 {
   "attachments": [
     {
-      "color": "warning",
-      "title": "IP Address Change Detected",
-      "fields": [
+      "color": "{{if eq .Action "add"}}good{{else if eq .Action "update"}}warning{{else}}danger{{end}}",
+      "blocks": [
         {
-          "title": "Agent ID",
-          "value": "{{.Agent.ID}}",
-          "short": true
+          "type": "header",
+          "text": {
+            "type": "plain_text",
+            "text": "IP Address Change Detected"
+          }
         },
         {
-          "title": "Hostname",
-          "value": "{{.Agent.Hostname}}",
-          "short": true
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "*{{.Action | toTitle}} - {{.Reason | toTitle}}*"
+          }
         },
         {
-          "title": "Type",
-          "value": "{{if .Change.IsExternal}}External IP{{else}}Interface IP{{end}}",
-          "short": true
+          "type": "section",
+          "fields": [
+            {
+              "type": "mrkdwn",
+              "text": "*Agent ID:*\n{{.Agent.ID}}"
+            },
+            {
+              "type": "mrkdwn",
+              "text": "*Hostname:*\n{{.Agent.Hostname}}"
+            },
+            {
+              "type": "mrkdwn",
+              "text": "*Type:*\n{{if .IsExternal}}External IP{{else}}Interface IP{{end}}"
+            },
+            {
+              "type": "mrkdwn",
+              "text": "*{{if .IsExternal}}IP Version{{else}}Interface{{end}}:*\n{{if .IsExternal}}{{.Version}}{{else}}{{.InterfaceName}}{{end}}"
+            }
+          ]
         },
+        {{if or .OldAddrs .NewAddrs}}{
+          "type": "section",
+          "fields": [
+            {{if .OldAddrs}}{
+              "type": "mrkdwn",
+              "text": "*Old IPs:*\n{{join .OldAddrs "\n"}}"
+            }{{end}}
+            {{if and .OldAddrs .NewAddrs}},{{end}}
+            {{if .NewAddrs}}{
+              "type": "mrkdwn",
+              "text": "*New IPs:*\n{{join .NewAddrs "\n"}}"
+            }{{end}}
+          ]
+        },{{end}}
         {
-          "title": "{{if .Change.IsExternal}}IP Version{{else}}Interface{{end}}",
-          "value": "{{if .Change.IsExternal}}{{.Change.Version}}{{else}}{{.Change.InterfaceName}}{{end}}",
-          "short": true
-        },
-        {
-          "title": "Old IPs",
-          "value": "{{join .Change.OldAddrs '\n'}}",
-          "short": true
-        },
-        {
-          "title": "New IPs",
-          "value": "{{join .Change.NewAddrs '\n'}}",
-          "short": true
+          "type": "context",
+          "elements": [
+            {
+              "type": "mrkdwn",
+              "text": "Changed at: {{.Timestamp | formatTime}}"
+            }
+          ]
         }
-      ],
-      "footer": "Wameter Monitoring",
-      "ts": "{{.Change.Timestamp.Unix}}"
+      ]
     }
   ]
 }

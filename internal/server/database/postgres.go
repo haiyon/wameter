@@ -33,7 +33,7 @@ func NewPostgresDatabase(dsn string, opts Options, logger *zap.Logger) (*Postgre
 	}
 
 	if err := database.initSchema(); err != nil {
-		base.Close()
+		_ = base.Close()
 		return nil, fmt.Errorf("failed to init schema: %w", err)
 	}
 
@@ -43,6 +43,7 @@ func NewPostgresDatabase(dsn string, opts Options, logger *zap.Logger) (*Postgre
 // initSchema creates PostgreSQL tables
 func (s *PostgresDatabase) initSchema() error {
 	queries := []string{
+		// metrics
 		`CREATE TABLE IF NOT EXISTS metrics (
 			id BIGSERIAL PRIMARY KEY,
 			agent_id VARCHAR(64) NOT NULL,
@@ -54,6 +55,7 @@ func (s *PostgresDatabase) initSchema() error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_metrics_agent_time
 		ON metrics(agent_id, timestamp)`,
+		// agents
 		`CREATE TABLE IF NOT EXISTS agents (
 			id VARCHAR(64) PRIMARY KEY,
 			hostname VARCHAR(255) NOT NULL,
@@ -65,6 +67,23 @@ func (s *PostgresDatabase) initSchema() error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_agents_last_seen ON agents(last_seen)`,
+		// ip changes
+		`CREATE TABLE IF NOT EXISTS ip_changes (
+        id BIGSERIAL PRIMARY KEY,
+        agent_id VARCHAR(64) NOT NULL,
+        interface_name VARCHAR(64),
+        version VARCHAR(10) NOT NULL,
+        is_external BOOLEAN NOT NULL,
+        old_addrs JSONB,
+        new_addrs JSONB,
+        action VARCHAR(20) NOT NULL,
+        reason VARCHAR(50) NOT NULL,
+        timestamp TIMESTAMP NOT NULL,
+        created_at TIMESTAMP NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ip_changes_agent_time ON ip_changes(agent_id, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_ip_changes_interface ON ip_changes(interface_name);
+    CREATE INDEX IF NOT EXISTS idx_ip_changes_created_at ON ip_changes(created_at)`,
 	}
 
 	tx, err := s.db.Begin()
@@ -181,7 +200,9 @@ func (s *PostgresDatabase) GetMetrics(ctx context.Context, query *MetricsQuery, 
 	if err != nil {
 		return nil, fmt.Errorf("failed to query metrics: %w", err)
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 
 	var results []*types.MetricsData
 	for rows.Next() {
@@ -218,6 +239,36 @@ func (s *PostgresDatabase) GetLatestMetrics(ctx context.Context, agentID string)
 		return nil, err
 	}
 	return &data, nil
+}
+
+// SaveIPChange stores an IP change
+func (s *PostgresDatabase) SaveIPChange(ctx context.Context, agentID string, change *types.IPChange) error {
+	oldAddrs, err := json.Marshal(change.OldAddrs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal old addresses: %w", err)
+	}
+
+	newAddrs, err := json.Marshal(change.NewAddrs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal new addresses: %w", err)
+	}
+
+	query := `
+        INSERT INTO ip_changes (
+            agent_id, interface_name, version, is_external,
+            old_addrs, new_addrs, action, reason, timestamp, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+
+	_, err = s.ExecContext(ctx, query,
+		agentID, change.InterfaceName, change.Version, change.IsExternal,
+		oldAddrs, newAddrs, change.Action, change.Reason,
+		change.Timestamp, time.Now())
+
+	if err != nil {
+		return fmt.Errorf("failed to save IP change: %w", err)
+	}
+
+	return nil
 }
 
 // GetAgent retrieves an agent

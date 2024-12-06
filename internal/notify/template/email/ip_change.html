@@ -16,13 +16,27 @@
       padding: 20px;
       border-radius: 5px;
     }
-    .content {
-      margin: 20px 0;
+    .alert {
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 10px;
     }
+    .alert-add { background-color: #28a745; }
+    .alert-update { background-color: #007bff; }
+    .alert-remove { background-color: #dc3545; }
     .changes {
       background: #f1f3f5;
       padding: 15px;
       border-radius: 5px;
+    }
+    .address-list {
+      font-family: monospace;
+      background: #f8f9fa;
+      padding: 8px;
+      border-radius: 4px;
+      margin: 4px 0;
     }
     .footer {
       color: #6c757d;
@@ -35,29 +49,42 @@
 <div class="container">
   <div class="header">
     <h2>🌐 IP Address Change Detected</h2>
+    <div class="alert alert-{{.Action}}">{{.Action | toTitle}} - {{.Reason | toTitle}}</div>
   </div>
   <div class="content">
     <div class="changes">
-      {{if .Change.IsExternal}}
+      {{if .IsExternal}}
       <h3>External IP Change</h3>
       <p><strong>Agent ID:</strong> {{.Agent.ID}}</p>
       <p><strong>Hostname:</strong> {{.Agent.Hostname}}</p>
-      <p><strong>IP Version:</strong> {{.Change.Version}}</p>
-      <p><strong>Old IP:</strong> {{index .Change.OldAddrs 0}}</p>
-      <p><strong>New IP:</strong> {{index .Change.NewAddrs 0}}</p>
+      <p><strong>IP Version:</strong> {{.Version}}</p>
+      {{if .OldAddrs}}
+      <p><strong>Old IP:</strong></p>
+      <div class="address-list">{{index .OldAddrs 0}}</div>
+      {{end}}
+      {{if .NewAddrs}}
+      <p><strong>New IP:</strong></p>
+      <div class="address-list">{{index .NewAddrs 0}}</div>
+      {{end}}
       {{else}}
       <h3>Interface IP Change</h3>
       <p><strong>Agent ID:</strong> {{.Agent.ID}}</p>
       <p><strong>Hostname:</strong> {{.Agent.Hostname}}</p>
-      <p><strong>Interface:</strong> {{.Change.InterfaceName}}</p>
-      <p><strong>IP Version:</strong> {{.Change.Version}}</p>
-      <p><strong>Old IPs:</strong> {{join .Change.OldAddrs ", "}}</p>
-      <p><strong>New IPs:</strong> {{join .Change.NewAddrs ", "}}</p>
+      <p><strong>Interface:</strong> {{.InterfaceName}}</p>
+      <p><strong>IP Version:</strong> {{.Version}}</p>
+      {{if .OldAddrs}}
+      <p><strong>Old IPs:</strong></p>
+      <div class="address-list">{{join .OldAddrs ", "}}</div>
+      {{end}}
+      {{if .NewAddrs}}
+      <p><strong>New IPs:</strong></p>
+      <div class="address-list">{{join .NewAddrs ", "}}</div>
+      {{end}}
       {{end}}
     </div>
   </div>
   <div class="footer">
-    <p>Changed at: {{.Change.Timestamp | formatTime}}</p>
+    <p>Changed at: {{.Timestamp | formatTime}}</p>
     <p>Wameter Monitoring System</p>
   </div>
 </div>

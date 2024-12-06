@@ -19,6 +19,7 @@ type Database interface {
 	BatchSaveMetrics(ctx context.Context, metrics []*types.MetricsData) error
 	GetMetrics(ctx context.Context, query *MetricsQuery, opts QueryOptions) ([]*types.MetricsData, error)
 	GetLatestMetrics(ctx context.Context, agentID string) (*types.MetricsData, error)
+	SaveIPChange(ctx context.Context, agentID string, change *types.IPChange) error
 
 	// Agent
 

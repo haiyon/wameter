@@ -18,14 +18,25 @@ const (
 	IPv6 IPVersion = "ipv6"
 )
 
+// IPChangeAction represents the type of IP change
+type IPChangeAction string
+
+const (
+	IPChangeActionAdd    IPChangeAction = "add"
+	IPChangeActionUpdate IPChangeAction = "update"
+	IPChangeActionRemove IPChangeAction = "remove"
+)
+
 // IPChange represents a detected IP address change
 type IPChange struct {
-	InterfaceName string    `json:"interface_name,omitempty"`
-	Version       IPVersion `json:"version"`
-	OldAddrs      []string  `json:"old_addrs"`
-	NewAddrs      []string  `json:"new_addrs"`
-	IsExternal    bool      `json:"is_external"`
-	Timestamp     time.Time `json:"timestamp"`
+	InterfaceName string         `json:"interface_name,omitempty"`
+	Version       IPVersion      `json:"version"`
+	OldAddrs      []string       `json:"old_addrs"`
+	NewAddrs      []string       `json:"new_addrs"`
+	IsExternal    bool           `json:"is_external"`
+	Timestamp     time.Time      `json:"timestamp"`
+	Action        IPChangeAction `json:"action"`
+	Reason        string         `json:"reason,omitempty"`
 }
 
 // IPAddress represents a parsed IP address

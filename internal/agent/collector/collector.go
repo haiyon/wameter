@@ -216,11 +216,9 @@ func (m *Manager) initCollectors() error {
 			m.config.Agent.Standalone,
 			m.logger,
 		)
-
 		if err := m.RegisterCollector(networkCollector); err != nil {
 			return fmt.Errorf("failed to register network collector: %w", err)
 		}
-		m.logger.Info("Network collector registered")
 	}
 
 	// Add other collectors as needed

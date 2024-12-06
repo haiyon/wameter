@@ -60,6 +60,8 @@ collector:
       change_threshold: 10    # Max changes in window
       threshold_window: 1h    # Time window for changes
       external_check_ttl: 5m  # External IP check frequency
+      notify_on_first_seen: true  # Notify on first seen
+      notify_on_removal: true     # Notify on removal
 
 # Notification configuration (used in standalone mode)
 notify:

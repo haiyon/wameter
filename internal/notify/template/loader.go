@@ -11,6 +11,7 @@ import (
 	"wameter/internal/utils"
 
 	"go.uber.org/zap"
+	"golang.org/x/text/cases"
 )
 
 //go:embed email/* slack/* wechat/* dingtalk/* discord/*
@@ -151,4 +152,5 @@ var templateFuncs = template.FuncMap{
 		}
 		return strings.Join(result, sep)
 	},
+	"toTitle": cases.Title,
 }

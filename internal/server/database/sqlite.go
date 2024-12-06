@@ -32,7 +32,7 @@ func NewSQLiteDatabase(dsn string, opts Options, logger *zap.Logger) (*SQLiteDat
 	}
 
 	if err := database.initSchema(); err != nil {
-		base.Close()
+		_ = base.Close()
 		return nil, fmt.Errorf("failed to init schema: %w", err)
 	}
 
@@ -42,31 +42,50 @@ func NewSQLiteDatabase(dsn string, opts Options, logger *zap.Logger) (*SQLiteDat
 // initSchema creates SQLite tables
 func (s *SQLiteDatabase) initSchema() error {
 	queries := []string{
+		// metrics
 		`CREATE TABLE IF NOT EXISTS agents (
-            id TEXT PRIMARY KEY,
-            hostname TEXT NOT NULL,
-            version TEXT NOT NULL,
-            status TEXT NOT NULL,
-            last_seen DATETIME NOT NULL,
-            registered_at DATETIME NOT NULL,
-            updated_at DATETIME NOT NULL
-        )`,
+        id TEXT PRIMARY KEY,
+        hostname TEXT NOT NULL,
+        version TEXT NOT NULL,
+        status TEXT NOT NULL,
+        last_seen DATETIME NOT NULL,
+        registered_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL
+    )`,
+		// ip changes
 		`CREATE TABLE IF NOT EXISTS metrics (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            agent_id TEXT NOT NULL,
-            timestamp DATETIME NOT NULL,
-            collected_at DATETIME NOT NULL,
-            reported_at DATETIME NOT NULL,
-            data JSON NOT NULL,
-            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (agent_id) REFERENCES agents(id)
-        )`,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL,
+        timestamp DATETIME NOT NULL,
+        collected_at DATETIME NOT NULL,
+        reported_at DATETIME NOT NULL,
+        data JSON NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (agent_id) REFERENCES agents(id)
+    )`,
 		`CREATE INDEX IF NOT EXISTS idx_metrics_agent_time
          ON metrics(agent_id, timestamp)`,
 		`CREATE INDEX IF NOT EXISTS idx_agents_status
          ON agents(status)`,
 		`CREATE INDEX IF NOT EXISTS idx_agents_last_seen
          ON agents(last_seen)`,
+		`
+    CREATE TABLE IF NOT EXISTS ip_changes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        agent_id TEXT NOT NULL,
+        interface_name TEXT,
+        version TEXT NOT NULL,
+        is_external INTEGER NOT NULL,
+        old_addrs TEXT,
+        new_addrs TEXT,
+        action TEXT NOT NULL,
+        reason TEXT NOT NULL,
+        timestamp DATETIME NOT NULL,
+        created_at DATETIME NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_ip_changes_agent_time ON ip_changes(agent_id, timestamp);
+    CREATE INDEX IF NOT EXISTS idx_ip_changes_interface ON ip_changes(interface_name);
+    CREATE INDEX IF NOT EXISTS idx_ip_changes_created_at ON ip_changes(created_at)`,
 	}
 
 	tx, err := s.db.Begin()
@@ -186,7 +205,9 @@ func (s *SQLiteDatabase) GetMetrics(ctx context.Context, query *MetricsQuery, op
 	if err != nil {
 		return nil, fmt.Errorf("failed to query metrics: %w", err)
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		_ = rows.Close()
+	}(rows)
 
 	var results []*types.MetricsData
 	for rows.Next() {
@@ -213,7 +234,7 @@ func (s *SQLiteDatabase) GetLatestMetrics(ctx context.Context, agentID string) (
 	var data types.MetricsData
 	var jsonData []byte
 	if err := row.Scan(&jsonData); err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, types.ErrAgentNotFound
 		}
 		return nil, err
@@ -223,6 +244,36 @@ func (s *SQLiteDatabase) GetLatestMetrics(ctx context.Context, agentID string) (
 		return nil, err
 	}
 	return &data, nil
+}
+
+// SaveIPChange stores an IP change
+func (s *SQLiteDatabase) SaveIPChange(ctx context.Context, agentID string, change *types.IPChange) error {
+	oldAddrs, err := json.Marshal(change.OldAddrs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal old addresses: %w", err)
+	}
+
+	newAddrs, err := json.Marshal(change.NewAddrs)
+	if err != nil {
+		return fmt.Errorf("failed to marshal new addresses: %w", err)
+	}
+
+	query := `
+        INSERT INTO ip_changes (
+            agent_id, interface_name, version, is_external,
+            old_addrs, new_addrs, action, reason, timestamp, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+	_, err = s.ExecContext(ctx, query,
+		agentID, change.InterfaceName, change.Version, change.IsExternal,
+		oldAddrs, newAddrs, change.Action, change.Reason,
+		change.Timestamp, time.Now())
+
+	if err != nil {
+		return fmt.Errorf("failed to save IP change: %w", err)
+	}
+
+	return nil
 }
 
 // GetAgent retrieves an agent

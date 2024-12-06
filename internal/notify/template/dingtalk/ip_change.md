@@ -1,22 +1,22 @@
 ### IP Address Change Detected
 
-{{if .Change.IsExternal}}
-**External IP Change**
+**{{.Action | toTitle}} - {{.Reason | toTitle}}**
 
-> Agent ID: {{.Agent.ID}}
-> Hostname: {{.Agent.Hostname}}
-> IP Version: {{.Change.Version}}
-> Old IP: {{index .Change.OldAddrs 0}}
-> New IP: {{index .Change.NewAddrs 0}}
-{{else}}
-**Interface IP Change**
+{{if .IsExternal}}
+#### External IP Change
+- Agent ID: {{.Agent.ID}}
+- Hostname: {{.Agent.Hostname}}
+- IP Version: {{.Version}}
+  {{if .OldAddrs}}- Old IP: {{index .OldAddrs 0}}{{end}}
+  {{if .NewAddrs}}- New IP: {{index .NewAddrs 0}}{{end}}
+  {{else}}
+#### Interface IP Change
+- Agent ID: {{.Agent.ID}}
+- Hostname: {{.Agent.Hostname}}
+- Interface: {{.InterfaceName}}
+- IP Version: {{.Version}}
+  {{if .OldAddrs}}- Old IPs: {{join .OldAddrs ", "}}{{end}}
+  {{if .NewAddrs}}- New IPs: {{join .NewAddrs ", "}}{{end}}
+  {{end}}
 
-> Agent ID: {{.Agent.ID}}
-> Hostname:{{.Agent.Hostname}}
-> Interface: {{.Change.InterfaceName}}
-> IP Version: {{.Change.Version}}
-> Old IPs: {{join .Change.OldAddrs ", "}}
-> New IPs: {{join .Change.NewAddrs ", "}}
-{{end}}
-
-_Changed at: {{.Change.Timestamp | formatTime}}_
+_Changed at: {{.Timestamp | formatTime}}_

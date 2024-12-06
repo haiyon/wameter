@@ -79,25 +79,29 @@ type FilterConfig struct {
 
 // IPTrackerConfig represents IP tracking configuration
 type IPTrackerConfig struct {
-	EnableIPv4       bool          `json:"enable_ipv4"`
-	EnableIPv6       bool          `json:"enable_ipv6"`
-	CleanupInterval  time.Duration `json:"cleanup_interval"`
-	RetentionPeriod  time.Duration `json:"retention_period"`
-	ChangeThreshold  int           `json:"change_threshold"`   // Max changes in window
-	ThresholdWindow  time.Duration `json:"threshold_window"`   // Time window for changes
-	ExternalCheckTTL time.Duration `json:"external_check_ttl"` // External IP check frequency
+	EnableIPv4        bool          `json:"enable_ipv4"`
+	EnableIPv6        bool          `json:"enable_ipv6"`
+	CleanupInterval   time.Duration `json:"cleanup_interval"`     // Cleanup interval
+	RetentionPeriod   time.Duration `json:"retention_period"`     // Retention period
+	ChangeThreshold   int           `json:"change_threshold"`     // Max changes in window
+	ThresholdWindow   time.Duration `json:"threshold_window"`     // Time window for changes
+	ExternalCheckTTL  time.Duration `json:"external_check_ttl"`   // External IP check frequency
+	NotifyOnFirstSeen bool          `json:"notify_on_first_seen"` // Notify on first seen
+	NotifyOnRemoval   bool          `json:"notify_on_removal"`    // Notify on removal
 }
 
 // IPtrackerDefaultConfig returns the default IP tracker configuration
 func IPtrackerDefaultConfig() *IPTrackerConfig {
 	return &IPTrackerConfig{
-		EnableIPv4:       true,
-		EnableIPv6:       true,
-		CleanupInterval:  1 * time.Hour,
-		RetentionPeriod:  24 * time.Hour,
-		ChangeThreshold:  10,
-		ThresholdWindow:  1 * time.Hour,
-		ExternalCheckTTL: 5 * time.Minute,
+		EnableIPv4:        true,
+		EnableIPv6:        true,
+		CleanupInterval:   1 * time.Hour,
+		RetentionPeriod:   24 * time.Hour,
+		ChangeThreshold:   10,
+		ThresholdWindow:   1 * time.Hour,
+		ExternalCheckTTL:  5 * time.Minute,
+		NotifyOnFirstSeen: true,
+		NotifyOnRemoval:   true,
 	}
 }
 
@@ -236,8 +240,19 @@ func validateConfig(cfg *Config) error {
 		}
 	}
 
-	if cfg.Collector.Network.Enabled && len(cfg.Collector.Network.Interfaces) == 0 {
-		return fmt.Errorf("at least one interface must be specified when network collector is enabled")
+	if cfg.Collector.Network.Enabled {
+		if len(cfg.Collector.Network.Interfaces) > 0 {
+			hasValidInterface := false
+			for _, iface := range cfg.Collector.Network.Interfaces {
+				if iface != "" {
+					hasValidInterface = true
+					break
+				}
+			}
+			if !hasValidInterface {
+				return fmt.Errorf("if interfaces list is provided, at least one valid interface must be specified")
+			}
+		}
 	}
 
 	if cfg.Agent.Standalone && cfg.Notify.Enabled {

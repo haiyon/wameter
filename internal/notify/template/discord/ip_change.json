@@ -1,43 +1,45 @@
 {
-  "embeds": [{
-    "title": "IP Address Change Detected",
-    "description": "Detected {{if .Change.IsExternal}} external IP{{else}} interface IP{{end}} changed",
-    "color": 16776960,
-    "fields": [
-      {
-        "name": "Agent ID",
-        "value": "{{.Agent.ID}}",
-        "inline": true
-      },
-      {
-        "name": "Hostname",
-        "value": "{{.Agent.Hostname}}",
-        "inline": true
-      },
-      {
-        "name": "Type",
-        "value": "{{if .Change.IsExternal}}External IP{{else}}Interface IP{{end}}",
-        "inline": true
-      },
-      {
-        "name": "IP Version",
-        "value": "{{.Change.Version}}",
-        "inline": true
-      },
-      {
-        "name": "Old IP",
-        "value": "{{join .Change.OldAddrs '\n'}}",
-        "inline": true
-      },
-      {
-        "name": "New IP",
-        "value": "{{join .Change.NewAddrs '\n'}}",
-        "inline": true
-      }
-    ],
+  "embeds": [
+    {
+      "title": "IP Address Change Detected",
+      "description": "{{.Action | toTitle}} - {{.Reason | toTitle}}",
+      "color": {{if eq .Action "add"}}3066993{{else if eq .Action "update"}}16776960{{else}}15158332{{end}},
+      "fields": [
+        {
+          "name": "Agent ID",
+          "value": "{{.Agent.ID}}",
+          "inline": true
+        },
+        {
+          "name": "Hostname",
+          "value": "{{.Agent.Hostname}}",
+          "inline": true
+        },
+        {
+          "name": "Type",
+          "value": "{{if .IsExternal}}External IP{{else}}Interface IP{{end}}",
+          "inline": true
+        },
+        {
+          "name": "{{if .IsExternal}}IP Version{{else}}Interface{{end}}",
+          "value": "{{if .IsExternal}}{{.Version}}{{else}}{{.InterfaceName}}{{end}}",
+          "inline": true
+        },
+        {{if .OldAddrs}}{
+          "name": "Old IPs",
+          "value": "{{join .OldAddrs '\n'}}",
+          "inline": true
+        },{{end}}
+        {{if .NewAddrs}}{
+          "name": "New IPs",
+          "value": "{{join .NewAddrs '\n'}}",
+          "inline": true
+        }{{end}}
+      ],
     "footer": {
       "text": "Wameter Monitoring"
     },
-    "timestamp": "{{.Change.Timestamp | formatTime}}"
-  }]
+    "timestamp": "{{.Timestamp | formatTime}}"
+    }
+  ]
 }

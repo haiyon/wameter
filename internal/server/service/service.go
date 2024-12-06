@@ -328,8 +328,24 @@ func (s *Service) processIPChanges(data *types.MetricsData) {
 	}
 
 	for _, change := range data.Metrics.Network.IPChanges {
-		if change.NewAddrs != nil && change.OldAddrs != nil {
-			s.notifier.NotifyIPChange(agent, &change)
+		s.logger.Debug("IP change detected",
+			zap.String("agent_id", agent.ID),
+			zap.String("hostname", agent.Hostname),
+			zap.String("interface", change.InterfaceName),
+			zap.String("version", string(change.Version)),
+			zap.String("action", string(change.Action)),
+			zap.String("reason", change.Reason),
+			zap.Bool("is_external", change.IsExternal),
+			zap.Time("timestamp", change.Timestamp))
+
+		// Send notification
+		s.notifier.NotifyIPChange(agent, &change)
+
+		// Save change to database
+		if err := s.database.SaveIPChange(context.Background(), agent.ID, &change); err != nil {
+			s.logger.Error("Failed to save IP change",
+				zap.Error(err),
+				zap.String("agent_id", agent.ID))
 		}
 	}
 }
