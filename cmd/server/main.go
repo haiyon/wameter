@@ -58,18 +58,19 @@ func main() {
 	defer cancel()
 
 	// Initialize database
-	store, err := database.NewDatabase(&cfg.Database, logger)
+	db, err := database.NewDatabase(&cfg.Database, logger)
 	if err != nil {
 		logger.Fatal("Failed to initialize database", zap.Error(err))
 	}
-	defer func(store database.Database) {
-		if err := store.Close(); err != nil {
+
+	defer func(db database.Database) {
+		if err := db.Close(); err != nil {
 			logger.Error("Failed to close database", zap.Error(err))
 		}
-	}(store)
+	}(db)
 
 	// Initialize service
-	svc, err := service.NewService(cfg, store, logger)
+	svc, err := service.NewService(cfg, db, logger)
 	if err != nil {
 		logger.Fatal("Failed to initialize service", zap.Error(err))
 	}
