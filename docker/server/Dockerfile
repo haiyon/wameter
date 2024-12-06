@@ -39,7 +39,7 @@ RUN apk add --no-cache ca-certificates tzdata
 
 # Copy binary and config
 COPY --from=builder /src/bin/wameter /app/
-COPY --from=builder /src/examples/server.example.yaml /app/config/server.yaml
+COPY --from=builder /src/examples/server.example.yaml /app/config/
 COPY docker/server/entrypoint.sh /app/
 
 # Set ownership and permissions

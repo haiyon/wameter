@@ -162,6 +162,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ endsWith(env.VERSION, '.0') }}
 
       - name: Build and push server image
         uses: docker/build-push-action@v5

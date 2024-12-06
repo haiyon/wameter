@@ -39,7 +39,7 @@ RUN apk add --no-cache ca-certificates tzdata iproute2 net-tools
 
 # Copy binary and config
 COPY --from=builder /src/bin/wameter-agent /app/
-COPY --from=builder /src/examples/agent.example.yaml /app/config/agent.yaml
+COPY --from=builder /src/examples/agent.example.yaml /app/config/
 COPY docker/agent/entrypoint.sh /app/
 
 # Set ownership and permissions

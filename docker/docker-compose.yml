@@ -17,7 +17,7 @@ services:
       retries: 3
 
   agent:
-    image: ghcr.io/haiyon/wameter-agent:latest
+    image: ghcr.io/haiyon/wameter:latest-agent
     container_name: wameter-agent
     restart: unless-stopped
     network_mode: "host"
