@@ -1,4 +1,4 @@
-package database
+package db
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// PostgresDatabase implements Database interface for PostgreSQL
+// PostgresDatabase implements database interface for PostgreSQL
 type PostgresDatabase struct {
 	*BaseDatabase
 }

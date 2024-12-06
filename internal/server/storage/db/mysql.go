@@ -1,4 +1,4 @@
-package database
+package db
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// MySQLDatabase implements Database interface for MySQL
+// MySQLDatabase implements database interface for MySQL
 type MySQLDatabase struct {
 	*BaseDatabase
 }

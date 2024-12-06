@@ -1,4 +1,4 @@
-package database
+package db
 
 import (
 	"context"
@@ -27,7 +27,7 @@ type Options struct {
 	PruneInterval    time.Duration
 }
 
-// BaseDatabase is the base implementation of the Database interface
+// BaseDatabase is the base implementation of the database interface
 type BaseDatabase struct {
 	driver    string
 	db        *sql.DB
@@ -37,7 +37,7 @@ type BaseDatabase struct {
 	pruneStop chan struct{}
 }
 
-// NewBaseDatabase creates new BaseDatabase
+// NewBaseDatabase creates new base database instance
 func NewBaseDatabase(driver, dsn string, opts Options, logger *zap.Logger) (*BaseDatabase, error) {
 	db, err := sql.Open(driver, dsn)
 	if err != nil {

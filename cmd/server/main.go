@@ -11,10 +11,10 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+	"wameter/internal/server/storage/db"
 
 	"wameter/internal/server/api"
 	"wameter/internal/server/config"
-	"wameter/internal/server/database"
 	"wameter/internal/server/service"
 	"wameter/internal/version"
 
@@ -58,19 +58,19 @@ func main() {
 	defer cancel()
 
 	// Initialize database
-	db, err := database.NewDatabase(&cfg.Database, logger)
+	d, err := db.NewDatabase(&cfg.Database, logger)
 	if err != nil {
 		logger.Fatal("Failed to initialize database", zap.Error(err))
 	}
 
-	defer func(db database.Database) {
+	defer func(db db.Interface) {
 		if err := db.Close(); err != nil {
 			logger.Error("Failed to close database", zap.Error(err))
 		}
-	}(db)
+	}(d)
 
 	// Initialize service
-	svc, err := service.NewService(cfg, db, logger)
+	svc, err := service.NewService(cfg, d, logger)
 	if err != nil {
 		logger.Fatal("Failed to initialize service", zap.Error(err))
 	}

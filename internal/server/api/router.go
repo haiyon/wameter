@@ -45,11 +45,6 @@ func (r *Router) Handler() http.Handler {
 	return r.engine
 }
 
-// ServeHTTP implements the http.Handler interface
-// func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-// 	r.engine.ServeHTTP(w, req)
-// }
-
 // setupMiddleware configures all middleware
 func (r *Router) setupMiddleware() {
 	m := middleware.New(r.config, r.logger)

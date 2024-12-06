@@ -17,14 +17,14 @@ import (
 
 // Collector defines the interface for all collectors
 type Collector interface {
-	// Start starts the collector
-	Start(ctx context.Context) error
-	// Stop stops the collector
-	Stop() error
 	// Name returns the collector name
 	Name() string
+	// Start starts the collector
+	Start(ctx context.Context) error
 	// Collect performs a single collection
 	Collect(ctx context.Context) (*types.MetricsData, error)
+	// Stop stops the collector
+	Stop() error
 }
 
 // Manager manages multiple collectors
@@ -84,45 +84,7 @@ func (m *Manager) Start(ctx context.Context) error {
 	m.mu.RUnlock()
 
 	// Start collection loop
-	go func() {
-		ticker := time.NewTicker(m.config.Collector.Interval)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				m.logger.Info("Stopping collection loop")
-				return
-			case <-ticker.C:
-				data, err := m.Collect(ctx)
-				if err != nil {
-					m.logger.Error("Failed to collect metrics", zap.Error(err))
-					continue
-				}
-
-				if data == nil {
-					m.logger.Debug("No data collected")
-					continue
-				}
-
-				// Ensure we have basic data fields
-				if data.Hostname == "" {
-					if hostname, err := os.Hostname(); err == nil {
-						data.Hostname = hostname
-					}
-				}
-
-				data.ReportedAt = time.Now()
-
-				// Send data if we have any
-				if !m.config.Agent.Standalone && m.reporter != nil {
-					if err := m.reporter.Report(data); err != nil {
-						m.logger.Error("Failed to report metrics", zap.Error(err))
-					}
-				}
-			}
-		}
-	}()
+	go m.startCollectorLoop(ctx)
 
 	return nil
 }
@@ -224,4 +186,45 @@ func (m *Manager) initCollectors() error {
 	// Add other collectors as needed
 
 	return nil
+}
+
+// startCollectorLoop starts the collector loop
+func (m *Manager) startCollectorLoop(ctx context.Context) {
+	ticker := time.NewTicker(m.config.Collector.Interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			m.logger.Info("Stopping collection loop")
+			return
+		case <-ticker.C:
+			data, err := m.Collect(ctx)
+			if err != nil {
+				m.logger.Error("Failed to collect metrics", zap.Error(err))
+				continue
+			}
+
+			if data == nil {
+				m.logger.Debug("No data collected")
+				continue
+			}
+
+			// Ensure we have basic data fields
+			if data.Hostname == "" {
+				if hostname, err := os.Hostname(); err == nil {
+					data.Hostname = hostname
+				}
+			}
+
+			data.ReportedAt = time.Now()
+
+			// Send data if we have any
+			if !m.config.Agent.Standalone && m.reporter != nil {
+				if err := m.reporter.Report(data); err != nil {
+					m.logger.Error("Failed to report metrics", zap.Error(err))
+				}
+			}
+		}
+	}
 }

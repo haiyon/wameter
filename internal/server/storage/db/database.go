@@ -1,4 +1,4 @@
-package database
+package db
 
 import (
 	"context"
@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// Database defines the interface for metric database
-type Database interface {
+// Interface represents a database interface
+type Interface interface {
 	// Metrics
 
 	SaveMetrics(ctx context.Context, data *types.MetricsData) error
@@ -56,7 +56,7 @@ type Metrics struct {
 }
 
 // NewDatabase creates a database instance based on driver type
-func NewDatabase(config *config.Database, logger *zap.Logger) (Database, error) {
+func NewDatabase(config *config.Database, logger *zap.Logger) (Interface, error) {
 	// Default options
 	opts := Options{
 		MaxOpenConns:     25,

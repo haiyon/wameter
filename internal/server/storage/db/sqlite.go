@@ -1,4 +1,4 @@
-package database
+package db
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// SQLiteDatabase implements Database interface for SQLite
+// SQLiteDatabase implements database interface for SQLite
 type SQLiteDatabase struct {
 	*BaseDatabase
 }
