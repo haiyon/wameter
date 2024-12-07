@@ -1,6 +1,8 @@
 # Wameter
 
-A cross-platform network monitoring and metrics tracking tool designed to handle a wide range of network-related tasks. It utilizes a server-agent architecture, supports multiple storage backends and notification channels, and provides a RESTful API for seamless integration.
+A cross-platform network monitoring and metrics tracking tool designed to handle a wide range of network-related tasks.
+It utilizes a server-agent architecture, supports multiple storage backends and notification channels, and provides a
+RESTful API for seamless integration.
 
 ## Features
 

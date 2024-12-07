@@ -10,7 +10,7 @@ services:
     ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/api/v1/health"]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8080/api/v1/health" ]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -26,7 +26,7 @@ services:
     depends_on:
       - server
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/api/v1/healthz"]
+      test: [ "CMD", "wget", "-q", "--spider", "http://localhost:8081/api/v1/healthz" ]
       interval: 30s
       timeout: 5s
       retries: 3

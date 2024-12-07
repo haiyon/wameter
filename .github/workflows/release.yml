@@ -171,7 +171,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [verify, build-all, docker-release]
+    needs: [ verify, build-all, docker-release ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
