@@ -18,6 +18,7 @@ type NotifyConfig struct {
 	WeChat   WeChatConfig   `mapstructure:"wechat"`
 	DingTalk DingTalkConfig `mapstructure:"dingtalk"`
 	Discord  DiscordConfig  `mapstructure:"discord"`
+	Feishu   FeishuConfig   `mapstructure:"feishu"`
 
 	// Global notification settings
 	RetryAttempts int                   `mapstructure:"retry_attempts"`
@@ -111,6 +112,14 @@ type DiscordConfig struct {
 	Templates  map[string]string `mapstructure:"templates"`
 }
 
+// FeishuConfig represents Feishu notification configuration
+type FeishuConfig struct {
+	Enabled    bool              `mapstructure:"enabled"`
+	WebhookURL string            `mapstructure:"webhook_url"`
+	Secret     string            `mapstructure:"secret"`
+	Templates  map[string]string `mapstructure:"templates"`
+}
+
 // Validate notification configuration
 func (cfg *NotifyConfig) Validate() error {
 	if !cfg.Enabled {
@@ -164,6 +173,12 @@ func (cfg *NotifyConfig) Validate() error {
 	if cfg.Webhook.Enabled {
 		if err := cfg.Webhook.Validate(); err != nil {
 			return fmt.Errorf("invalid webhook config: %w", err)
+		}
+	}
+
+	if cfg.Feishu.Enabled {
+		if err := cfg.Feishu.Validate(); err != nil {
+			return fmt.Errorf("invalid feishu config: %w", err)
 		}
 	}
 
@@ -255,6 +270,17 @@ func (cfg *WebhookConfig) Validate() error {
 	}
 	if cfg.MaxRetries < 0 {
 		return fmt.Errorf("max_retries cannot be negative")
+	}
+	return nil
+}
+
+// Validate validates Feishu configuration
+func (cfg *FeishuConfig) Validate() error {
+	if !cfg.Enabled {
+		return nil
+	}
+	if cfg.WebhookURL == "" {
+		return fmt.Errorf("webhook URL is required")
 	}
 	return nil
 }

@@ -14,7 +14,7 @@ import (
 	"golang.org/x/text/cases"
 )
 
-//go:embed email/* slack/* wechat/* dingtalk/* discord/*
+//go:embed email/* slack/* wechat/* dingtalk/* discord/* feishu/*
 var templateFS embed.FS
 
 // Type represents the type of notification template
@@ -26,6 +26,7 @@ const (
 	WeChat   Type = "wechat"
 	DingTalk Type = "dingtalk"
 	Discord  Type = "discord"
+	Feishu   Type = "feishu"
 )
 
 // Loader manages notification templates
@@ -59,6 +60,7 @@ func (t *Loader) loadDefaultTemplates() error {
 		WeChat,
 		DingTalk,
 		Discord,
+		Feishu,
 	} {
 		pattern := string(tplType)
 		tmpl := template.New("").Funcs(templateFuncs)

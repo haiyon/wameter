@@ -1,0 +1,57 @@
+{
+  "header": {
+    "title": {
+      "tag": "plain_text",
+      "content": "IP Address Change Detected"
+    },
+    "template": "{{if eq .Action \"add\"}}green{{else if eq .Action \"update\"}}blue{{else}}red{{end}}"
+  },
+  "elements": [
+    {
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**{{.Action | toTitle}} - {{.Reason | toTitle}}**"
+      }
+    },
+    {
+      "tag": "div",
+      "fields": [
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**Agent ID:** {{.Agent.ID}}"
+          }
+        },
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**Hostname:** {{.Agent.Hostname}}"
+          }
+        }
+      ]
+    },
+    {{if .IsExternal}}{
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**External IP Change**\n- IP Version: {{.Version}}\n{{if .OldAddrs}}- Old IP: {{index .OldAddrs 0}}{{end}}\n{{if .NewAddrs}}- New IP: {{index .NewAddrs 0}}{{end}}"
+      }
+    }{{else}}{
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**Interface IP Change**\n- Interface: {{.InterfaceName}}\n- IP Version: {{.Version}}\n{{if .OldAddrs}}- Old IPs: {{join .OldAddrs \", \"}}{{end}}\n{{if .NewAddrs}}- New IPs: {{join .NewAddrs \", \"}}{{end}}"
+      }
+    }{{end}},
+    {
+      "tag": "note",
+      "elements": [{
+        "tag": "plain_text",
+        "content": "Changed at: {{.Timestamp | formatTime}}"
+      }]
+    }
+  ]
+}

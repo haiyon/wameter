@@ -1,0 +1,46 @@
+{
+  "header": {
+    "title": {
+      "tag": "plain_text",
+      "content": "Network Errors Alert"
+    },
+    "template": "orange"
+  },
+  "elements": [
+    {
+      "tag": "div",
+      "fields": [
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**Agent ID:** {{.AgentID}}"
+          }
+        },
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**Interface:** {{.Interface.Name}} ({{.Interface.Type}})"
+          }
+        }
+      ]
+    },
+    {
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**Error Statistics:**\n- RX Errors: {{.Interface.Statistics.RxErrors}}\n- TX Errors: {{.Interface.Statistics.TxErrors}}\n- RX Dropped: {{.Interface.Statistics.RxDropped}}\n- TX Dropped: {{.Interface.Statistics.TxDropped}}"
+      }
+    },
+    {
+      "tag": "note",
+      "elements": [
+        {
+          "tag": "plain_text",
+          "content": "Alert generated at {{.Timestamp | formatTime}}"
+        }
+      ]
+    }
+  ]
+}

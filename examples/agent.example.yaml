@@ -114,7 +114,7 @@ notify:
   dingtalk:
     enabled: false
     access_token: ""
-    secret: ""      for signature
+    secret: ""      # For signature
     at_mobiles: [ ]
     at_user_ids: [ ]
     at_all: false
@@ -141,6 +141,12 @@ notify:
       X-Custom-Header: "value"
     common_data: # Optional: data added to all webhooks
       environment: "production"
+
+  # Feishu notifications
+  feishu:
+    enabled: false
+    webhook_url: ""
+    secret: ""      # For signature
 
 # Logging configuration
 log:

@@ -1,0 +1,46 @@
+{
+  "header": {
+    "title": {
+      "tag": "plain_text",
+      "content": "High Network Utilization"
+    },
+    "template": "yellow"
+  },
+  "elements": [
+    {
+      "tag": "div",
+      "fields": [
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**Agent ID:** {{.AgentID}}"
+          }
+        },
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**Interface:** {{.Interface.Name}} ({{.Interface.Type}})"
+          }
+        }
+      ]
+    },
+    {
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "**Current Rates:**\n- Receive: {{.Stats.RxRate}}/s\n- Transmit: {{.Stats.TxRate}}/s\n\n**Total Traffic:**\n- Received: {{.Stats.RxTotal}}\n- Transmitted: {{.Stats.TxTotal}}"
+      }
+    },
+    {
+      "tag": "note",
+      "elements": [
+        {
+          "tag": "plain_text",
+          "content": "Alert generated at {{.Timestamp | formatTime}}"
+        }
+      ]
+    }
+  ]
+}

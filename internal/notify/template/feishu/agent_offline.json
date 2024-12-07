@@ -1,0 +1,60 @@
+{
+  "header": {
+    "title": {
+      "tag": "plain_text",
+      "content": "Agent Offline Alert"
+    },
+    "template": "red"
+  },
+  "elements": [
+    {
+      "tag": "div",
+      "text": {
+        "tag": "lark_md",
+        "content": "An agent has gone offline and requires attention."
+      }
+    },
+    {
+      "tag": "div",
+      "fields": [
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**Agent ID:** {{.Agent.ID}}"
+          }
+        },
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**Hostname:** {{.Agent.Hostname}}"
+          }
+        },
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**Last Seen:** {{.Agent.LastSeen | formatTime}}"
+          }
+        },
+        {
+          "is_short": true,
+          "text": {
+            "tag": "lark_md",
+            "content": "**Status:** {{.Agent.Status}}"
+          }
+        }
+      ]
+    },
+    {
+      "tag": "note",
+      "elements": [
+        {
+          "tag": "plain_text",
+          "content": "Alert generated at {{.Timestamp | formatTime}}"
+        }
+      ]
+    }
+  ]
+}

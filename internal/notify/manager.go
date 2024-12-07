@@ -23,6 +23,7 @@ const (
 	NotifierDingTalk NotifierType = "dingtalk"
 	NotifierDiscord  NotifierType = "discord"
 	NotifierWebhook  NotifierType = "webhook"
+	NotifierFeishu   NotifierType = "feishu"
 )
 
 // Notifier represents notifier interface
@@ -173,6 +174,14 @@ func NewManager(cfg *config.NotifyConfig, logger *zap.Logger) (*Manager, error) 
 			m.notifiers[NotifierWebhook] = n
 		} else {
 			logger.Error("Failed to initialize webhook notifier", zap.Error(err))
+		}
+	}
+
+	if cfg.Feishu.Enabled {
+		if n, err := NewFeishuNotifier(&cfg.Feishu, m.tplLoader, logger); err == nil {
+			m.notifiers[NotifierFeishu] = n
+		} else {
+			logger.Error("Failed to initialize feishu notifier", zap.Error(err))
 		}
 	}
 

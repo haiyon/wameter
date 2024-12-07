@@ -7,7 +7,7 @@ RESTful API for seamless integration.
 ## Features
 
 - Monitor network interfaces and traffic statistics
-- Multi-channel notifications (Email, Slack, Telegram, Discord, etc.)
+- Multi-channel notifications (Email, Webhook, Feishu, DingTalk, etc.)
 - Support for multiple databases (SQLite, MySQL, PostgreSQL)
 - RESTful API with OpenAPI documentation
 - Extensible design for future use cases
