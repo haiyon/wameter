@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
-	"wameter/internal/server/storage/db"
+	"wameter/internal/server/db"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
