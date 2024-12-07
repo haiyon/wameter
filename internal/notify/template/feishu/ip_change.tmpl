@@ -4,7 +4,7 @@
       "tag": "plain_text",
       "content": "IP Address Change Detected"
     },
-    "template": "{{if eq .Action \"add\"}}green{{else if eq .Action \"update\"}}blue{{else}}red{{end}}"
+    "template": "{{if eq .Action `add`}}green{{else if eq .Action `update`}}blue{{else}}red{{end}}"
   },
   "elements": [
     {
@@ -43,7 +43,7 @@
       "tag": "div",
       "text": {
         "tag": "lark_md",
-        "content": "**Interface IP Change**\n- Interface: {{.InterfaceName}}\n- IP Version: {{.Version}}\n{{if .OldAddrs}}- Old IPs: {{join .OldAddrs \", \"}}{{end}}\n{{if .NewAddrs}}- New IPs: {{join .NewAddrs \", \"}}{{end}}"
+        "content": "**Interface IP Change**\n- Interface: {{.InterfaceName}}\n- IP Version: {{.Version}}\n{{if .OldAddrs}}- Old IPs: {{join .OldAddrs `, `}}{{end}}\n{{if .NewAddrs}}- New IPs: {{join .NewAddrs `, `}}{{end}}"
       }
     }{{end}},
     {
