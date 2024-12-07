@@ -66,5 +66,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
 
 # Labels
 LABEL org.opencontainers.image.source="https://github.com/haiyon/wameter" \
-    org.opencontainers.image.description="Wameter Agent - Network monitoring agent" \
+    org.opencontainers.image.title="wameter-agent" \
+    org.opencontainers.image.description="Monitoring agent" \
     org.opencontainers.image.licenses="MIT"

@@ -65,5 +65,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
 
 # Labels
 LABEL org.opencontainers.image.source="https://github.com/haiyon/wameter" \
-    org.opencontainers.image.description="Wameter Server - Network monitoring server" \
+    org.opencontainers.image.title="wameter" \
+    org.opencontainers.image.description="Monitoring server" \
     org.opencontainers.image.licenses="MIT"

@@ -1,4 +1,3 @@
-# version: "3.8"
 services:
   server:
     image: ghcr.io/haiyon/wameter:latest
@@ -17,7 +16,7 @@ services:
       retries: 3
 
   agent:
-    image: ghcr.io/haiyon/wameter:latest-agent
+    image: ghcr.io/haiyon/wameter-agent:latest
     container_name: wameter-agent
     restart: unless-stopped
     network_mode: "host"
