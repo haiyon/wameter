@@ -133,8 +133,8 @@ tidy:
 .PHONY: verify
 verify: tidy
 	@echo "Verifying module..."
-	@go mod verify
-	@git diff --exit-code go.mod go.sum || (echo "go.mod or go.sum is dirty" && exit 1)
+	@go mod verify || (echo "go mod verify failed. Attempting to resolve..."; go clean -modcache; go mod tidy; go mod download; go mod verify)
+	@git diff --exit-code go.mod go.sum || (echo "Warning: go.mod or go.sum is dirty. Please review and commit the changes manually." && exit 1)
 
 .PHONY: clean
 clean:

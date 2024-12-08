@@ -32,11 +32,12 @@ type networkCollector struct {
 	ipTracker  *IPTracker
 	reporter   *reporter.Reporter
 	notifier   *notify.Manager
-	stopChan   chan struct{}
 	lastState  *types.NetworkState
 	mu         sync.RWMutex
 	client     *http.Client
 	standalone bool
+	wg         sync.WaitGroup
+	shutdown   chan struct{}
 }
 
 // NewCollector creates a new network collector
@@ -44,26 +45,29 @@ func NewCollector(cfg *config.NetworkConfig, agentID string, reporter *reporter.
 	if cfg.IPTracker == nil {
 		cfg.IPTracker = config.IPtrackerDefaultConfig()
 	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			IdleConnTimeout:     90 * time.Second,
+			DisableCompression:  true,
+			DisableKeepAlives:   false,
+			MaxIdleConnsPerHost: 10,
+		},
+	}
+
 	return &networkCollector{
 		config:     cfg,
 		agentID:    agentID,
 		logger:     logger,
-		stopChan:   make(chan struct{}),
+		shutdown:   make(chan struct{}),
 		ipTracker:  NewIPTracker(cfg.IPTracker, logger),
 		reporter:   reporter,
 		notifier:   notifier,
 		standalone: standalone,
 		stats:      newStatsCollector(cfg, logger),
-		client: &http.Client{
-			Timeout: 10 * time.Second,
-			Transport: &http.Transport{
-				MaxIdleConns:        100,
-				IdleConnTimeout:     90 * time.Second,
-				DisableCompression:  true,
-				DisableKeepAlives:   false,
-				MaxIdleConnsPerHost: 10,
-			},
-		},
+		client:     client,
 	}
 }
 
@@ -89,7 +93,21 @@ func (c *networkCollector) Start(ctx context.Context) error {
 
 // Stop stops the collector
 func (c *networkCollector) Stop() error {
-	close(c.stopChan)
+	close(c.shutdown)
+
+	// Wait for all goroutines to finish
+	doneChan := make(chan struct{})
+	go func() {
+		c.wg.Wait()
+		close(doneChan)
+	}()
+
+	select {
+	case <-doneChan:
+		c.logger.Info("Network collector stopped successfully")
+	case <-time.After(30 * time.Second):
+		c.logger.Warn("Network collector stop timed out")
+	}
 
 	if err := c.stats.Stop(); err != nil {
 		c.logger.Error("Failed to stop stats collector", zap.Error(err))
@@ -308,53 +326,57 @@ func (c *networkCollector) shouldMonitorInterface(iface net.Interface) bool {
 	return true
 }
 
+// result represents the result of an external IP query
+type result struct {
+	provider string
+	ip       string
+	err      error
+}
+
 // getExternalIP attempts to get the external IP using configured providers
 func (c *networkCollector) getExternalIP(ctx context.Context) (string, error) {
 	if len(c.config.ExternalProviders) == 0 {
 		return "", fmt.Errorf("no external IP providers configured")
 	}
 
-	type result struct {
-		provider string
-		ip       string
-		err      error
-	}
+	// Create context with timeout
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
 
-	// Create buffered channel to prevent goroutine leaks
 	results := make(chan result, len(c.config.ExternalProviders))
-	deadline := time.After(10 * time.Second)
+	var wg sync.WaitGroup
 
 	// Query all providers concurrently
 	for _, provider := range c.config.ExternalProviders {
+		wg.Add(1)
 		go func(p string) {
+			defer wg.Done()
 			ip, err := c.queryExternalProvider(ctx, p)
 			select {
 			case results <- result{p, ip, err}:
 			case <-ctx.Done():
-			case <-deadline:
 			}
 		}(provider)
 	}
+
+	// Close results channel after all goroutines finish
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
 	// Use map to track IP consensus
 	ips := make(map[string]int)
 	var lastErr error
 
-	for i := 0; i < len(c.config.ExternalProviders); i++ {
-		select {
-		case r := <-results:
-			if r.err != nil {
-				lastErr = r.err
-				continue
-			}
-			ips[r.ip]++
-			if count := ips[r.ip]; count >= 2 {
-				return r.ip, nil
-			}
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-deadline:
-			return "", fmt.Errorf("timeout waiting for external IP providers")
+	for r := range results {
+		if r.err != nil {
+			lastErr = r.err
+			continue
+		}
+		ips[r.ip]++
+		if count := ips[r.ip]; count >= 2 {
+			return r.ip, nil
 		}
 	}
 
@@ -381,14 +403,10 @@ func (c *networkCollector) queryExternalProvider(ctx context.Context, provider s
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "wameter-agent/1.0")
+	req.Header.Set("User-Agent", "wameter-agent/"+version.GetInfo().Version)
 	req.Header.Set("Accept", "text/plain")
 
-	client := &http.Client{
-		Timeout: 5 * time.Second,
-	}
-
-	resp, err := client.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("request failed: %w", err)
 	}
@@ -439,7 +457,7 @@ func (c *networkCollector) handleIPChanges(changes []types.IPChange) {
 			zap.String("reason", change.Reason))
 
 		// In standalone mode or if local notifications are enabled, notify directly
-		if c.standalone && c.notifier != nil && c.notifier.IsEnabled() {
+		if c.standalone && c.notifier != nil {
 			c.notifier.NotifyIPChange(agent, &change)
 		}
 	}

@@ -108,11 +108,9 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// Wait for signal
-	sig := <-sigChan
-	logger.Info("Received signal", zap.String("signal", sig.String()))
+	<-sigChan
 
 	// Graceful shutdown
-	logger.Info("Starting graceful shutdown")
 	cancel()
 
 	// Stop components in reverse order

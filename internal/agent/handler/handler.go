@@ -1,12 +1,18 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"sync"
 	"time"
+	"wameter/internal/types"
+	"wameter/internal/version"
 
 	"wameter/internal/agent/collector"
 	"wameter/internal/agent/config"
@@ -39,8 +45,8 @@ func NewHandler(cfg *config.Config, logger *zap.Logger, cm *collector.Manager) *
 
 	// Create HTTP server for receiving commands
 	mux := http.NewServeMux()
-	mux.HandleFunc("/api/v1/command", h.handleCommand)
-	mux.HandleFunc("/api/v1/healthz", h.handleHealthCheck)
+	mux.HandleFunc("/v1/command", h.handleCommand)
+	mux.HandleFunc("/v1/healthz", h.handleHealthCheck)
 
 	h.server = &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.Agent.Port),
@@ -61,6 +67,14 @@ func (h *Handler) RegisterCollector(name string, c collector.Collector) error {
 
 // Start begins handling commands and HTTP requests
 func (h *Handler) Start(ctx context.Context) error {
+	if !h.config.Agent.Standalone {
+		// Register agent
+		if err := h.registerAgent(ctx); err != nil {
+			h.logger.Error("Failed to register agent", zap.Error(err))
+			return err
+		}
+	}
+
 	// Start command processor
 	h.wg.Add(1)
 	go h.processCommands(ctx)
@@ -69,10 +83,15 @@ func (h *Handler) Start(ctx context.Context) error {
 	h.wg.Add(1)
 	go func() {
 		defer h.wg.Done()
-		if err := h.server.ListenAndServe(); err != http.ErrServerClosed {
+		if err := h.server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			h.logger.Error("HTTP server error", zap.Error(err))
 		}
 	}()
+
+	if !h.config.Agent.Standalone {
+		h.wg.Add(1)
+		go h.heartbeat(ctx)
+	}
 
 	return nil
 }
@@ -90,6 +109,135 @@ func (h *Handler) Stop() error {
 	}
 
 	h.wg.Wait()
+	return nil
+}
+
+// registerAgent registers the agent with the server
+func (h *Handler) registerAgent(ctx context.Context) error {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("failed to get hostname: %w", err)
+	}
+
+	agent := &types.AgentInfo{
+		ID:       h.config.Agent.ID,
+		Hostname: hostname,
+		Version:  version.GetInfo().Version,
+		Port:     h.config.Agent.Port,
+		Status:   types.AgentStatusOnline,
+	}
+
+	// Build request
+	url := fmt.Sprintf("%s/v1/agents", h.config.Agent.Server.Address)
+	payload, err := json.Marshal(agent)
+	if err != nil {
+		return fmt.Errorf("failed to marshal agent info: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "wameter-agent/"+version.GetInfo().Version)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to register agent: %w", err)
+	}
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to register agent: status=%d body=%s", resp.StatusCode, string(body))
+	}
+
+	h.logger.Info("Agent registered successfully",
+		zap.String("id", h.config.Agent.ID),
+		zap.String("hostname", hostname))
+
+	return nil
+}
+
+// heartbeat handles agent heartbeat
+func (h *Handler) heartbeat(ctx context.Context) {
+	defer h.wg.Done()
+
+	interval := h.config.Agent.Heartbeat.Interval
+	if interval == 0 {
+		interval = 30 * time.Second
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	failureCount := 0
+	maxFailures := h.config.Agent.Heartbeat.MaxFailures
+	if maxFailures == 0 {
+		maxFailures = 3
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-h.stopChan:
+			return
+		case <-ticker.C:
+			if err := h.sendHeartbeat(ctx); err != nil {
+				failureCount++
+				h.logger.Error("Failed to send heartbeat",
+					zap.Error(err),
+					zap.Int("failure_count", failureCount))
+
+				if failureCount >= maxFailures {
+					h.logger.Error("Max heartbeat failures reached, attempting to re-register")
+					if err := h.registerAgent(ctx); err != nil {
+						h.logger.Error("Failed to re-register agent", zap.Error(err))
+					} else {
+						failureCount = 0
+					}
+				}
+			} else {
+				failureCount = 0
+			}
+		}
+	}
+}
+
+// sendHeartbeat sends a heartbeat to the server
+func (h *Handler) sendHeartbeat(ctx context.Context) error {
+	url := fmt.Sprintf("%s/v1/agents/%s/heartbeat",
+		h.config.Agent.Server.Address,
+		h.config.Agent.ID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create heartbeat request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "wameter-agent/"+version.GetInfo().Version)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send heartbeat: %w", err)
+	}
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("heartbeat failed: status=%d body=%s", resp.StatusCode, string(body))
+	}
+
+	h.logger.Debug("Heartbeat sent successfully")
 	return nil
 }
 

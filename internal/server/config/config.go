@@ -11,10 +11,37 @@ import (
 // Config represents the complete server configuration
 type Config struct {
 	Server   ServerConfig         `mapstructure:"server"`
-	Database Database             `mapstructure:"database"`
+	Database DatabaseConfig       `mapstructure:"database"`
 	Notify   *config.NotifyConfig `mapstructure:"notify"`
 	API      APIConfig            `mapstructure:"api"`
 	Log      LogConfig            `mapstructure:"log"`
+}
+
+// Validate validates the configuration
+func (cfg *Config) Validate() error {
+	// Validate database configuration
+	if err := cfg.Database.Validate(); err != nil {
+		return fmt.Errorf("invalid database config: %w", err)
+	}
+
+	// Validate TLS configuration
+	if cfg.Server.TLS.Enabled {
+		if err := cfg.Server.TLS.Validate(); err != nil {
+			return fmt.Errorf("invalid TLS config: %w", err)
+		}
+	}
+
+	// Validate notification configuration
+	if err := cfg.Notify.Validate(); err != nil {
+		return fmt.Errorf("invalid notification config: %w", err)
+	}
+
+	// Validate API configuration
+	if err := cfg.API.Validate(); err != nil {
+		return fmt.Errorf("invalid API config: %w", err)
+	}
+
+	return nil
 }
 
 // ServerConfig represents the server configuration
@@ -27,6 +54,14 @@ type ServerConfig struct {
 	TLS          TLSConfig     `mapstructure:"tls"`
 }
 
+// Validate server configuration
+func (cfg *ServerConfig) Validate() error {
+	if cfg.Address == "" {
+		return fmt.Errorf("server address is required")
+	}
+	return nil
+}
+
 // TLSConfig represents the TLS configuration
 type TLSConfig struct {
 	Enabled           bool   `mapstructure:"enabled"`
@@ -36,6 +71,14 @@ type TLSConfig struct {
 	MinVersion        string `mapstructure:"min_version"` // TLS1.2, TLS1.3
 	MaxVersion        string `mapstructure:"max_version"`
 	RequireClientCert bool   `mapstructure:"require_client_cert"`
+}
+
+// Validate TLS configuration
+func (cfg *TLSConfig) Validate() error {
+	if cfg.CertFile == "" || cfg.KeyFile == "" {
+		return fmt.Errorf("TLS cert and key files are required")
+	}
+	return nil
 }
 
 // APIConfig represents the API configuration
@@ -59,6 +102,16 @@ type APIConfig struct {
 	Docs DocsConfig `mapstructure:"docs"`
 }
 
+// Validate API configuration
+func (cfg *APIConfig) Validate() error {
+	if cfg.Auth.Enabled {
+		if err := cfg.Auth.Validate(); err != nil {
+			return fmt.Errorf("invalid auth config: %w", err)
+		}
+	}
+	return nil
+}
+
 // AuthConfig represents the authentication configuration
 type AuthConfig struct {
 	Enabled      bool          `mapstructure:"enabled"`
@@ -66,6 +119,23 @@ type AuthConfig struct {
 	JWTSecret    string        `mapstructure:"jwt_secret"`
 	JWTDuration  time.Duration `mapstructure:"jwt_duration"`
 	AllowedUsers []string      `mapstructure:"allowed_users"`
+}
+
+// Validate auth configuration
+func (cfg *AuthConfig) Validate() error {
+	switch cfg.Type {
+	case "jwt":
+		if cfg.JWTSecret == "" {
+			return fmt.Errorf("JWT secret is required")
+		}
+	case "apikey", "basic":
+		if len(cfg.AllowedUsers) == 0 {
+			return fmt.Errorf("allowed users list is required")
+		}
+	default:
+		return fmt.Errorf("unsupported auth type: %s", cfg.Type)
+	}
+	return nil
 }
 
 // CORSConfig represents the CORS configuration
@@ -78,12 +148,30 @@ type CORSConfig struct {
 	AllowCredentials bool     `mapstructure:"allow_credentials"`
 }
 
+// Validate CORS configuration
+func (cfg *CORSConfig) Validate() error {
+	if len(cfg.AllowedOrigins) == 0 {
+		return fmt.Errorf("allowed origins list is required")
+	}
+	return nil
+}
+
 // RateLimitConfig represents the rate limiting configuration
 type RateLimitConfig struct {
 	Enabled  bool          `mapstructure:"enabled"`
 	Requests int           `mapstructure:"requests"`
 	Window   time.Duration `mapstructure:"window"`
 	Strategy string        `mapstructure:"strategy"` // token, leaky, sliding
+}
+
+// Validate rate limiting configuration
+func (cfg *RateLimitConfig) Validate() error {
+	switch cfg.Strategy {
+	case "token", "leaky", "sliding":
+	default:
+		return fmt.Errorf("unsupported rate limit strategy: %s", cfg.Strategy)
+	}
+	return nil
 }
 
 // MetricsConfig represents the metrics configuration
@@ -95,12 +183,28 @@ type MetricsConfig struct {
 	ServiceName string `mapstructure:"service_name"`
 }
 
+// Validate metrics configuration
+func (cfg *MetricsConfig) Validate() error {
+	if cfg.Path == "" {
+		return fmt.Errorf("metrics path is required")
+	}
+	return nil
+}
+
 // DocsConfig represents the documentation configuration
 type DocsConfig struct {
 	Enabled bool   `mapstructure:"enabled"`
 	Path    string `mapstructure:"path"`
 	Title   string `mapstructure:"title"`
 	Version string `mapstructure:"version"`
+}
+
+// Validate docs configuration
+func (cfg *DocsConfig) Validate() error {
+	if cfg.Path == "" {
+		return fmt.Errorf("docs path is required")
+	}
+	return nil
 }
 
 // LogConfig represents the logging configuration
@@ -113,6 +217,11 @@ type LogConfig struct {
 	MaxAge     int    `mapstructure:"max_age"` // days
 	Compress   bool   `mapstructure:"compress"`
 	Color      bool   `mapstructure:"color"`
+}
+
+// Validate logging configuration
+func (cfg *LogConfig) Validate() error {
+	return nil
 }
 
 // LoadConfig loads server configuration from file
@@ -197,66 +306,4 @@ func setDefaults(cfg *Config) {
 			"Content-Type", "Authorization", "X-Request-ID",
 		}
 	}
-}
-
-// Validate validates the configuration
-func (cfg *Config) Validate() error {
-	// Validate database configuration
-	if err := cfg.Database.Validate(); err != nil {
-		return fmt.Errorf("invalid database config: %w", err)
-	}
-
-	// Validate TLS configuration
-	if cfg.Server.TLS.Enabled {
-		if err := cfg.Server.TLS.Validate(); err != nil {
-			return fmt.Errorf("invalid TLS config: %w", err)
-		}
-	}
-
-	// Validate notification configuration
-	if err := cfg.Notify.Validate(); err != nil {
-		return fmt.Errorf("invalid notification config: %w", err)
-	}
-
-	// Validate API configuration
-	if err := cfg.API.Validate(); err != nil {
-		return fmt.Errorf("invalid API config: %w", err)
-	}
-
-	return nil
-}
-
-// Validate TLS configuration
-func (cfg *TLSConfig) Validate() error {
-	if cfg.CertFile == "" || cfg.KeyFile == "" {
-		return fmt.Errorf("TLS cert and key files are required")
-	}
-	return nil
-}
-
-// Validate API configuration
-func (cfg *APIConfig) Validate() error {
-	if cfg.Auth.Enabled {
-		if err := cfg.Auth.Validate(); err != nil {
-			return fmt.Errorf("invalid auth config: %w", err)
-		}
-	}
-	return nil
-}
-
-// Validate auth configuration
-func (cfg *AuthConfig) Validate() error {
-	switch cfg.Type {
-	case "jwt":
-		if cfg.JWTSecret == "" {
-			return fmt.Errorf("JWT secret is required")
-		}
-	case "apikey", "basic":
-		if len(cfg.AllowedUsers) == 0 {
-			return fmt.Errorf("allowed users list is required")
-		}
-	default:
-		return fmt.Errorf("unsupported auth type: %s", cfg.Type)
-	}
-	return nil
 }

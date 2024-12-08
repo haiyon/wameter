@@ -25,6 +25,10 @@ type AgentConfig struct {
 	Port       int          `mapstructure:"port"`
 	Server     ServerConfig `mapstructure:"server"`
 	Standalone bool         `mapstructure:"standalone"`
+	Heartbeat  struct {
+		Interval    time.Duration `mapstructure:"interval"`
+		MaxFailures int           `mapstructure:"max_failures"`
+	} `mapstructure:"heartbeat"`
 }
 
 // ServerConfig represents server configuration

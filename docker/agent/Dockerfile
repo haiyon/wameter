@@ -23,7 +23,7 @@ RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
     -X 'wameter/internal/version.Version=$(git describe --tags --always --dirty 2>/dev/null || echo "dev")' \
     -X 'wameter/internal/version.GitCommit=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")' \
     -X 'wameter/internal/version.BuildDate=$(date -u "+%Y-%m-%d_%H:%M:%S")' \
-    -X 'wameter/internal/version.GoVersion=$(go version | cut -d" " -f3)'" \
+    -X 'wameter/internal/version.GoVersion=$(go version | cut -n" " -f3)'" \
     -o /src/bin/wameter-agent \
     ./cmd/agent
 
@@ -62,7 +62,7 @@ CMD ["-config", "/app/config/agent.yaml"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD wget -q --spider http://localhost:8081/api/v1/healthz || exit 1
+    CMD wget -q --spider http://localhost:8081/v1/healthz || exit 1
 
 # Labels
 LABEL org.opencontainers.image.source="https://github.com/haiyon/wameter" \

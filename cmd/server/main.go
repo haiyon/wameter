@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+	"wameter/internal/database"
 	"wameter/internal/server/api"
 	"wameter/internal/server/config"
-	"wameter/internal/server/db"
 	"wameter/internal/server/service"
 	"wameter/internal/version"
 
@@ -53,66 +53,26 @@ func main() {
 	}(logger)
 
 	// Create context with cancellation
-	_, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize database
-	d, err := db.NewDatabase(&cfg.Database, logger)
-	if err != nil {
-		logger.Fatal("Failed to initialize database", zap.Error(err))
+	if err := run(ctx, cfg, logger); err != nil {
+		logger.Fatal("Failed to run server", zap.Error(err))
 	}
-
-	defer func(db db.Interface) {
-		if err := db.Close(); err != nil {
-			logger.Error("Failed to close database", zap.Error(err))
-		}
-	}(d)
-
-	// Initialize service
-	svc, err := service.NewService(cfg, d, logger)
-	if err != nil {
-		logger.Fatal("Failed to initialize service", zap.Error(err))
-	}
-	defer func(svc *service.Service) {
-		if err := svc.Stop(); err != nil {
-			logger.Error("Failed to stop service", zap.Error(err))
-		}
-	}(svc)
-
-	// Initialize router
-	router := api.NewRouter(cfg, svc, logger)
-
-	// Create HTTP server
-	server := &http.Server{
-		Addr:    cfg.Server.Address,
-		Handler: router.Handler(),
-	}
-
-	// Start server in background
-	go func() {
-		logger.Info("Starting server",
-			zap.String("address", cfg.Server.Address))
-		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-			logger.Fatal("Server error", zap.Error(err))
-		}
-	}()
 
 	// Handle signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	// Wait for signal
-	sig := <-sigChan
-	logger.Info("Received signal", zap.String("signal", sig.String()))
+	<-sigChan
 
 	// Graceful shutdown
-	logger.Info("Starting graceful shutdown")
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 
-	if err := server.Shutdown(shutdownCtx); err != nil {
-		logger.Error("Server shutdown error", zap.Error(err))
-	}
+	cancel()
+	<-shutdownCtx.Done()
 
 	logger.Info("Shutdown complete")
 }
@@ -180,4 +140,47 @@ func initLogger(cfg config.LogConfig) (*zap.Logger, error) {
 	)
 
 	return logger.Named("server"), nil
+}
+
+// run runs the server
+func run(ctx context.Context, cfg *config.Config, logger *zap.Logger) error {
+	// Initialize database
+	db, err := database.New(&cfg.Database, logger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	defer func(db database.Interface) {
+		_ = db.Close()
+	}(db)
+
+	// Initialize service
+	svc, err := service.NewService(cfg, db, logger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize service: %w", err)
+	}
+
+	// Create http server
+	router := api.NewRouter(cfg, svc, logger)
+	server := &http.Server{
+		Addr:    cfg.Server.Address,
+		Handler: router.Handler(),
+	}
+
+	// Start server in background
+	go func() {
+		select {
+		case <-ctx.Done():
+			if err := server.Shutdown(context.Background()); err != nil {
+				logger.Error("Server shutdown error", zap.Error(err))
+			}
+		}
+	}()
+
+	logger.Info("Starting server", zap.String("address", cfg.Server.Address))
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		logger.Fatal("Server error", zap.Error(err))
+	}
+
+	return nil
 }

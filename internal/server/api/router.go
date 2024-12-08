@@ -73,7 +73,7 @@ func (r *Router) setupAPIV1(svc *service.Service) {
 	api := av1.NewAPI(svc, r.logger)
 
 	// Create v1 route group
-	v1Router := r.engine.Group("/api/v1")
+	v1Router := r.engine.Group("/v1")
 
 	// Add authentication for protected routes
 	if r.config.API.Auth.Enabled {

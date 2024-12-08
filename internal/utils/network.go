@@ -175,6 +175,8 @@ func GetInterfaceStats(name string) (*types.InterfaceStats, error) {
 		if err := getLinuxStats(name, stats); err != nil {
 			return nil, err
 		}
+	} else {
+		return nil, fmt.Errorf("unsupported OS")
 	}
 
 	return stats, nil

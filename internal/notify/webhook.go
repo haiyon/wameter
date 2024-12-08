@@ -15,6 +15,7 @@ import (
 	"wameter/internal/config"
 	ntpl "wameter/internal/notify/template"
 	"wameter/internal/types"
+	"wameter/internal/version"
 
 	"go.uber.org/zap"
 )
@@ -176,7 +177,7 @@ func (n *WebhookNotifier) sendWebhook(payload WebhookPayload) error {
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "wameter-webhook/1.0")
+	req.Header.Set("User-Agent", "wameter-webhook/"+version.GetInfo().Version)
 	req.Header.Set("X-Wameter-Event", payload.EventType)
 	req.Header.Set("X-Wameter-Delivery", payload.EventID)
 

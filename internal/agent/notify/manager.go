@@ -16,8 +16,9 @@ type Manager struct {
 
 // NewManager creates a new notification manager for agent
 func NewManager(cfg *config.NotifyConfig, logger *zap.Logger) (*Manager, error) {
+	// Check if notifications are enabled
 	if !cfg.Enabled {
-		return &Manager{logger: logger}, nil
+		return nil, nil
 	}
 
 	notifier, err := notify.NewManager(cfg, logger)
@@ -39,16 +40,8 @@ func (m *Manager) Stop() error {
 	return nil
 }
 
-// IsEnabled checks if notifications are enabled
-func (m *Manager) IsEnabled() bool {
-	return m.notifier != nil && m.notifier.IsEnabled()
-}
-
 // NotifyIPChange sends IP change notification
 func (m *Manager) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) {
-	if !m.IsEnabled() {
-		return
-	}
 	m.notifier.NotifyIPChange(agent, change)
 }
 

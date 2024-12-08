@@ -5,8 +5,8 @@ import (
 	"time"
 )
 
-// Database represents database configuration
-type Database struct {
+// DatabaseConfig represents database configuration
+type DatabaseConfig struct {
 	Driver          string        `mapstructure:"driver"`
 	DSN             string        `mapstructure:"dsn"`
 	MaxConnections  int           `mapstructure:"max_connections"`
@@ -17,6 +17,8 @@ type Database struct {
 	// Migration settings
 	AutoMigrate    bool   `mapstructure:"auto_migrate"`
 	MigrationsPath string `mapstructure:"migrations_path"`
+	RollbackSteps  int    `mapstructure:"rollback_steps,omitempty"`
+	TargetVersion  int    `mapstructure:"target_version,omitempty"`
 
 	// Data retention settings
 	EnablePruning    bool          `mapstructure:"enable_pruning"`
@@ -34,12 +36,16 @@ type Database struct {
 }
 
 // Validate validates database configuration
-func (c *Database) Validate() error {
+func (c *DatabaseConfig) Validate() error {
 	if c.Driver == "" {
 		return fmt.Errorf("database driver is required")
 	}
 	if c.DSN == "" {
 		return fmt.Errorf("database DSN is required")
+	}
+
+	if c.AutoMigrate && c.MigrationsPath == "" {
+		return fmt.Errorf("migrations path is required when auto migrate is enabled")
 	}
 
 	// Set default values

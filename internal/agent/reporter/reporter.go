@@ -142,21 +142,24 @@ func (r *Reporter) sendData(ctx context.Context, data *types.MetricsData) error 
 	}
 
 	// Create request
-	url := fmt.Sprintf("%s/api/v1/metrics", r.config.Agent.Server.Address)
+	url := fmt.Sprintf("%s/v1/metrics", r.config.Agent.Server.Address)
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "wameter-agent/1.0")
+	req.Header.Set("User-Agent", "wameter-agent/"+version.GetInfo().Version)
 
 	// Send request
 	resp, err := r.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 	"wameter/internal/server/api/response"
@@ -31,16 +32,13 @@ func (api *API) RegisterMetricsRoutes(r *gin.RouterGroup) {
 		metrics.POST("", api.saveMetrics)
 		metrics.GET("", api.getMetrics)
 		metrics.GET("/latest", api.getLatestMetrics)
+		metrics.GET("/export", api.exportMetrics)
 	}
 }
 
 // saveMetrics handles saving metrics data
 func (api *API) saveMetrics(c *gin.Context) {
 	resp := response.New(c, api.logger)
-
-	// Create context with timeout
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
-	defer cancel()
 
 	var data types.MetricsData
 	if err := c.ShouldBindJSON(&data); err != nil {
@@ -74,7 +72,7 @@ func (api *API) saveMetrics(c *gin.Context) {
 	// Set reported time
 	data.ReportedAt = time.Now()
 
-	if err := api.service.SaveMetrics(ctx, &data); err != nil {
+	if err := api.service.SaveMetrics(c.Request.Context(), &data); err != nil {
 		if errors.Is(err, context.Canceled) {
 			api.logger.Info("Client canceled metrics save request",
 				zap.String("agent_id", data.AgentID))
@@ -95,9 +93,6 @@ func (api *API) saveMetrics(c *gin.Context) {
 // getMetrics handles retrieving metrics data
 func (api *API) getMetrics(c *gin.Context) {
 	resp := response.New(c, api.logger)
-
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
-	defer cancel()
 
 	var query struct {
 		AgentIDs     []string `form:"agent_ids"`
@@ -145,7 +140,7 @@ func (api *API) getMetrics(c *gin.Context) {
 		query.Limit = 10000
 	}
 
-	metrics, err := api.service.GetMetrics(ctx, service.MetricsQuery{
+	metrics, err := api.service.GetMetrics(c.Request.Context(), service.MetricsQuery{
 		AgentIDs:  query.AgentIDs,
 		StartTime: startTime,
 		EndTime:   endTime,
@@ -178,16 +173,13 @@ func (api *API) getMetrics(c *gin.Context) {
 func (api *API) getLatestMetrics(c *gin.Context) {
 	resp := response.New(c, api.logger)
 
-	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
-	defer cancel()
-
 	agentID := c.Query("agent_id")
 	if agentID == "" {
 		resp.BadRequest(errors.New("agent_id is required"))
 		return
 	}
 
-	metrics, err := api.service.GetLatestMetrics(ctx, agentID)
+	metrics, err := api.service.GetLatestMetrics(c.Request.Context(), agentID)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			api.logger.Info("Client canceled latest metrics request",
@@ -209,4 +201,70 @@ func (api *API) getLatestMetrics(c *gin.Context) {
 	}
 
 	resp.Success(metrics)
+}
+
+func (api *API) exportMetrics(c *gin.Context) {
+	resp := response.New(c, api.logger)
+
+	// Parse export request
+	var filter struct {
+		Format      string    `form:"format" binding:"required,oneof=json csv"`
+		StartTime   time.Time `form:"start_time" binding:"required"`
+		EndTime     time.Time `form:"end_time" binding:"required"`
+		AgentIDs    []string  `form:"agent_ids"`
+		MetricTypes []string  `form:"metric_types"`
+		Compress    bool      `form:"compress"`
+		IncludeRaw  bool      `form:"include_raw"`
+	}
+
+	if err := c.ShouldBindQuery(&filter); err != nil {
+		resp.BadRequest(fmt.Errorf("invalid export parameters: %w", err))
+		return
+	}
+
+	// Validate time range
+	if filter.EndTime.Before(filter.StartTime) {
+		resp.BadRequest(errors.New("end_time must be after start_time"))
+		return
+	}
+
+	if filter.EndTime.Sub(filter.StartTime) > 30*24*time.Hour {
+		resp.BadRequest(errors.New("time range cannot exceed 30 days"))
+		return
+	}
+
+	// Convert to metrics filter
+	metricsFilter := types.MetricsFilter{
+		StartTime:   filter.StartTime,
+		EndTime:     filter.EndTime,
+		AgentIDs:    filter.AgentIDs,
+		MetricTypes: filter.MetricTypes,
+	}
+
+	// Export metrics
+	reader, err := api.service.ExportMetrics(c.Request.Context(), filter.Format, metricsFilter)
+	if err != nil {
+		api.logger.Error("Failed to export metrics",
+			zap.Error(err),
+			zap.Time("start_time", filter.StartTime),
+			zap.Time("end_time", filter.EndTime),
+			zap.String("format", filter.Format))
+		resp.InternalError(errors.New("failed to export metrics"))
+		return
+	}
+
+	// Set response headers
+	c.Header("Content-Type", utils.GetContentType(filter.Format))
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=metrics-%s.%s",
+		time.Now().Format("2006-01-02"), filter.Format))
+
+	// Stream response
+	c.Stream(func(w io.Writer) bool {
+		_, err := io.Copy(w, reader)
+		if err != nil {
+			api.logger.Error("Failed to write export data",
+				zap.Error(err))
+		}
+		return err == nil
+	})
 }

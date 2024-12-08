@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS ip_changes;
+DROP TABLE IF EXISTS metrics;
+DROP TABLE IF EXISTS agents;

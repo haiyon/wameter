@@ -59,7 +59,7 @@ func (m *Middleware) Logger() gin.HandlerFunc {
 		method := c.Request.Method
 		errorMessage := c.Errors.ByType(gin.ErrorTypePrivate).String()
 
-		m.logger.Info("request completed",
+		m.logger.Debug("request completed",
 			zap.String("request_id", requestID),
 			zap.String("method", method),
 			zap.String("path", path),

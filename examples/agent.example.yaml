@@ -3,6 +3,10 @@ agent:
   id: ""  # Required, unique agent identifier, if not set will be hostname
   hostname: "" # Optional, defaults to system hostname
   port: 8081  # Agent API port for commands
+  # Heartbeat settings
+  heartbeat:
+    interval: 30s
+    max_failures: 3 # Max consecutive failures before disabling
   # Standalone mode config
   standalone: false # Set to true to run without server
   # Server connection settings (required if not standalone)
