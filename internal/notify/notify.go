@@ -39,6 +39,9 @@ type Notifier interface {
 
 	// NotifyIPChange sends IP change notification
 	NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error
+
+	// Health checks the health of the notifier
+	Health(ctx context.Context) error
 }
 
 // notification represents a notification to be sent
@@ -305,6 +308,24 @@ func (m *Manager) Stop() error {
 	case <-time.After(30 * time.Second):
 		return fmt.Errorf("timeout waiting for notifications to complete")
 	}
+}
+
+// Health checks the health of the notification manager
+func (m *Manager) Health(ctx context.Context) error {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for t := range m.notifiers {
+		notifyType := t // Capture for closure
+		m.notifyChan <- notification{
+			notifierType: notifyType,
+			notifyFunc: func(n Notifier) error {
+				return n.Health(ctx)
+			},
+		}
+	}
+
+	return nil
 }
 
 // IsEnabled checks if a notifier is enabled

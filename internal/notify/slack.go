@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 	"wameter/internal/config"
@@ -76,39 +77,39 @@ func NewSlackNotifier(cfg *config.SlackConfig, loader *ntpl.Loader, logger *zap.
 }
 
 // NotifyAgentOffline sends agent offline notification
-func (s *SlackNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
+func (n *SlackNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
-	return s.sendTemplate("agent_offline", data)
+	return n.sendTemplate("agent_offline", data)
 }
 
 // NotifyNetworkErrors sends a network errors notification
-func (s *SlackNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
+func (n *SlackNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-	return s.sendTemplate("network_error", data)
+	return n.sendTemplate("network_error", data)
 }
 
 // NotifyHighNetworkUtilization sends a high network utilization notification
-func (s *SlackNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
+func (n *SlackNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-	return s.sendTemplate("high_utilization", data)
+	return n.sendTemplate("high_utilization", data)
 }
 
 // NotifyIPChange sends IP change notification
-func (s *SlackNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+func (n *SlackNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
 	data := map[string]any{
 		"Agent":         agent,
 		"Change":        change,
@@ -119,12 +120,12 @@ func (s *SlackNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPC
 		"NewAddrs":      change.NewAddrs,
 		"InterfaceName": change.InterfaceName,
 	}
-	return s.sendTemplate("ip_change", data)
+	return n.sendTemplate("ip_change", data)
 }
 
 // sendTemplate sends Slack message
-func (s *SlackNotifier) sendTemplate(templateName string, data map[string]any) error {
-	tmpl, err := s.tplLoader.GetTemplate(ntpl.Slack, templateName)
+func (n *SlackNotifier) sendTemplate(templateName string, data map[string]any) error {
+	tmpl, err := n.tplLoader.GetTemplate(ntpl.Slack, templateName)
 	if err != nil {
 		return fmt.Errorf("failed to get template: %w", err)
 	}
@@ -139,16 +140,16 @@ func (s *SlackNotifier) sendTemplate(templateName string, data map[string]any) e
 		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
-	msg.Channel = s.config.Channel
-	msg.Username = s.config.Username
-	msg.IconEmoji = s.config.IconEmoji
-	msg.IconURL = s.config.IconURL
+	msg.Channel = n.config.Channel
+	msg.Username = n.config.Username
+	msg.IconEmoji = n.config.IconEmoji
+	msg.IconURL = n.config.IconURL
 
-	return s.send(msg)
+	return n.send(msg)
 }
 
 // send sends a slack message
-func (s *SlackNotifier) send(msg SlackMessage) error {
+func (n *SlackNotifier) send(msg SlackMessage) error {
 	payload, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal slack message: %w", err)
@@ -157,22 +158,31 @@ func (s *SlackNotifier) send(msg SlackMessage) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.config.WebhookURL, bytes.NewBuffer(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, n.config.WebhookURL, bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := s.client.Do(req)
+	resp, err := n.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("slack api error: status code %d", resp.StatusCode)
 	}
 
+	return nil
+}
+
+// Health checks the health of the notifier
+func (n *SlackNotifier) Health(_ context.Context) error {
+	// Note: Add health check logic here
 	return nil
 }

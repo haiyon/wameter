@@ -2,8 +2,10 @@ package notify
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 	"wameter/internal/config"
@@ -77,39 +79,39 @@ func NewDiscordNotifier(cfg *config.DiscordConfig, loader *ntpl.Loader, logger *
 }
 
 // NotifyAgentOffline sends agent offline notification
-func (d *DiscordNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
+func (n *DiscordNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
-	return d.sendTemplate("agent_offline", data)
+	return n.sendTemplate("agent_offline", data)
 }
 
 // NotifyNetworkErrors sends network errors notification
-func (d *DiscordNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
+func (n *DiscordNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-	return d.sendTemplate("network_error", data)
+	return n.sendTemplate("network_error", data)
 }
 
 // NotifyHighNetworkUtilization sends high network utilization notification
-func (d *DiscordNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
+func (n *DiscordNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-	return d.sendTemplate("high_utilization", data)
+	return n.sendTemplate("high_utilization", data)
 }
 
 // NotifyIPChange sends IP change notification
-func (d *DiscordNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+func (n *DiscordNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
 	data := map[string]any{
 		"Agent":         agent,
 		"Change":        change,
@@ -120,12 +122,12 @@ func (d *DiscordNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.I
 		"NewAddrs":      change.NewAddrs,
 		"InterfaceName": change.InterfaceName,
 	}
-	return d.sendTemplate("ip_change", data)
+	return n.sendTemplate("ip_change", data)
 }
 
 // sendTemplate sends Discord message
-func (d *DiscordNotifier) sendTemplate(templateName string, data map[string]any) error {
-	tmpl, err := d.tplLoader.GetTemplate(ntpl.Discord, templateName)
+func (n *DiscordNotifier) sendTemplate(templateName string, data map[string]any) error {
+	tmpl, err := n.tplLoader.GetTemplate(ntpl.Discord, templateName)
 	if err != nil {
 		return fmt.Errorf("failed to get template: %w", err)
 	}
@@ -140,24 +142,27 @@ func (d *DiscordNotifier) sendTemplate(templateName string, data map[string]any)
 		return fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 
-	msg.Username = d.config.Username
-	msg.AvatarURL = d.config.AvatarURL
+	msg.Username = n.config.Username
+	msg.AvatarURL = n.config.AvatarURL
 
-	return d.send(msg)
+	return n.send(msg)
 }
 
 // send sends Discord message
-func (d *DiscordNotifier) send(msg DiscordMessage) error {
+func (n *DiscordNotifier) send(msg DiscordMessage) error {
 	payload, err := json.Marshal(msg)
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 
-	resp, err := d.client.Post(d.config.WebhookURL, "application/json", bytes.NewBuffer(payload))
+	resp, err := n.client.Post(n.config.WebhookURL, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	if resp.StatusCode == 429 {
 		// Handle rate limiting
@@ -165,7 +170,7 @@ func (d *DiscordNotifier) send(msg DiscordMessage) error {
 		if retryAfter != "" {
 			if seconds, err := time.ParseDuration(retryAfter + "s"); err == nil {
 				time.Sleep(seconds)
-				return d.send(msg) // Retry after waiting
+				return n.send(msg) // Retry after waiting
 			}
 		}
 		return fmt.Errorf("discord rate limit exceeded")
@@ -175,5 +180,11 @@ func (d *DiscordNotifier) send(msg DiscordMessage) error {
 		return fmt.Errorf("discord api error: status code %d", resp.StatusCode)
 	}
 
+	return nil
+}
+
+// Health checks the health of the notifier
+func (n *DiscordNotifier) Health(_ context.Context) error {
+	// Note: Add health check logic here
 	return nil
 }

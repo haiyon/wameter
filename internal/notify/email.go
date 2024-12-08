@@ -2,6 +2,7 @@ package notify
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net/smtp"
@@ -126,13 +127,19 @@ func (n *EmailNotifier) sendTLSEmail(auth smtp.Auth, msg []byte) error {
 	if err != nil {
 		return fmt.Errorf("failed to create TLS connection: %w", err)
 	}
-	defer conn.Close()
+
+	defer func(conn *tls.Conn) {
+		_ = conn.Close()
+	}(conn)
 
 	client, err := smtp.NewClient(conn, n.config.SMTPServer)
 	if err != nil {
 		return fmt.Errorf("failed to create SMTP client: %w", err)
 	}
-	defer client.Close()
+
+	defer func(client *smtp.Client) {
+		_ = client.Close()
+	}(client)
 
 	if err = client.Auth(auth); err != nil {
 		return fmt.Errorf("authentication failed: %w", err)
@@ -164,7 +171,7 @@ func (n *EmailNotifier) sendTLSEmail(auth smtp.Auth, msg []byte) error {
 	}
 
 	if _, err = w.Write(msg); err != nil {
-		w.Close()
+		_ = w.Close()
 		return fmt.Errorf("failed to write message: %w", err)
 	}
 
@@ -219,4 +226,10 @@ func cleanEmailAddresses(addrs []string) []string {
 		cleaned[i] = cleanEmailAddress(addr)
 	}
 	return cleaned
+}
+
+// Health checks the health of the notifier
+func (n *EmailNotifier) Health(_ context.Context) error {
+	// Note: Add health check logic here
+	return nil
 }

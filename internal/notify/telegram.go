@@ -63,7 +63,7 @@ func NewTelegramNotifier(cfg *config.TelegramConfig, loader *ntpl.Loader, logger
 }
 
 // NotifyAgentOffline sends agent offline notification
-func (t *TelegramNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
+func (n *TelegramNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	message := fmt.Sprintf(
 		"🚨 *Agent Offline Alert*\n\n"+
 			"Agent has gone offline and requires attention.\n\n"+
@@ -79,11 +79,11 @@ func (t *TelegramNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 		agent.Status,
 		fmt.Sprintf("Alert generated at %s", time.Now().Format("2006-01-02 15:04:05")))
 
-	return t.sendToAll(message)
+	return n.sendToAll(message)
 }
 
 // NotifyNetworkErrors sends network errors notification
-func (t *TelegramNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
+func (n *TelegramNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
 	message := fmt.Sprintf(
 		"⚠️ *Network Errors Alert*\n\n"+
 			"High number of network errors detected.\n\n"+
@@ -106,11 +106,11 @@ func (t *TelegramNotifier) NotifyNetworkErrors(agentID string, iface *types.Inte
 		iface.Statistics.TxDropped,
 		fmt.Sprintf("Alert generated at %s", time.Now().Format("2006-01-02 15:04:05")))
 
-	return t.sendToAll(message)
+	return n.sendToAll(message)
 }
 
 // NotifyHighNetworkUtilization sends high network utilization notification
-func (t *TelegramNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
+func (n *TelegramNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
 	message := fmt.Sprintf(
 		"📈 *High Network Utilization*\n\n"+
 			"*Interface Details:*\n"+
@@ -133,11 +133,11 @@ func (t *TelegramNotifier) NotifyHighNetworkUtilization(agentID string, iface *t
 		utils.FormatBytes(iface.Statistics.TxBytes),
 		fmt.Sprintf("Alert generated at %s", time.Now().Format("2006-01-02 15:04:05")))
 
-	return t.sendToAll(message)
+	return n.sendToAll(message)
 }
 
 // NotifyIPChange sends IP change notification
-func (t *TelegramNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+func (n *TelegramNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
 	var description string
 	if change.IsExternal {
 		description = fmt.Sprintf(
@@ -175,23 +175,23 @@ func (t *TelegramNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.
 			fmt.Sprintf("Changed at %s", change.Timestamp.Format("2006-01-02 15:04:05")))
 	}
 
-	return t.sendToAll(description)
+	return n.sendToAll(description)
 }
 
 // sendToAll sends message to all chat IDs
-func (t *TelegramNotifier) sendToAll(text string) error {
+func (n *TelegramNotifier) sendToAll(text string) error {
 	var errors []string
 
 	// Use proper format based on config
-	format := strings.ToLower(t.config.Format)
+	format := strings.ToLower(n.config.Format)
 	if format == "" {
 		format = "markdown" // default format
 	}
 
-	for _, chatID := range t.config.ChatIDs {
-		if err := t.sendMessage(chatID, text, format); err != nil {
+	for _, chatID := range n.config.ChatIDs {
+		if err := n.sendMessage(chatID, text, format); err != nil {
 			errors = append(errors, fmt.Sprintf("chat_id %s: %v", chatID, err))
-			t.logger.Error("Failed to send telegram message",
+			n.logger.Error("Failed to send telegram message",
 				zap.Error(err),
 				zap.String("chat_id", chatID))
 		}
@@ -205,7 +205,7 @@ func (t *TelegramNotifier) sendToAll(text string) error {
 }
 
 // sendMessage sends a message to a specific chat ID
-func (t *TelegramNotifier) sendMessage(chatID, text, format string) error {
+func (n *TelegramNotifier) sendMessage(chatID, text, format string) error {
 	msg := TelegramMessage{
 		ChatID:    chatID,
 		Text:      text,
@@ -217,7 +217,7 @@ func (t *TelegramNotifier) sendMessage(chatID, text, format string) error {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
 
-	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", t.config.BotToken)
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", n.config.BotToken)
 
 	// Create request with context and timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -230,7 +230,7 @@ func (t *TelegramNotifier) sendMessage(chatID, text, format string) error {
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := t.client.Do(req)
+	resp, err := n.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
@@ -248,7 +248,7 @@ func (t *TelegramNotifier) sendMessage(chatID, text, format string) error {
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&rateLimitResp); err == nil {
 			time.Sleep(time.Duration(rateLimitResp.Parameters.RetryAfter) * time.Second)
-			return t.sendMessage(chatID, text, format) // Retry after waiting
+			return n.sendMessage(chatID, text, format) // Retry after waiting
 		}
 		return fmt.Errorf("rate limit exceeded")
 	}
@@ -263,5 +263,11 @@ func (t *TelegramNotifier) sendMessage(chatID, text, format string) error {
 		return fmt.Errorf("telegram API error: %s", errorResp.Description)
 	}
 
+	return nil
+}
+
+// Health checks the health of the notifier
+func (n *TelegramNotifier) Health(_ context.Context) error {
+	// Note: Add health check logic here
 	return nil
 }

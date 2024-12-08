@@ -2,12 +2,14 @@ package notify
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 	"wameter/internal/config"
@@ -39,7 +41,7 @@ type WebhookPayload struct {
 // NewWebhookNotifier creates new webhook notifier
 func NewWebhookNotifier(cfg *config.WebhookConfig, loader *ntpl.Loader, logger *zap.Logger) (*WebhookNotifier, error) {
 	client := &http.Client{
-		Timeout: time.Duration(cfg.Timeout),
+		Timeout: cfg.Timeout,
 		Transport: &http.Transport{
 			MaxIdleConns:        100,
 			IdleConnTimeout:     90 * time.Second,
@@ -58,7 +60,7 @@ func NewWebhookNotifier(cfg *config.WebhookConfig, loader *ntpl.Loader, logger *
 }
 
 // NotifyAgentOffline sends an agent offline notification
-func (w *WebhookNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
+func (n *WebhookNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	payload := WebhookPayload{
 		EventType: "agent.offline",
 		EventID:   generateEventID(),
@@ -73,11 +75,11 @@ func (w *WebhookNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 		},
 	}
 
-	return w.sendWebhook(payload)
+	return n.sendWebhook(payload)
 }
 
 // NotifyNetworkErrors sends a network errors notification
-func (w *WebhookNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
+func (n *WebhookNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
 	payload := WebhookPayload{
 		EventType: "network.errors",
 		EventID:   generateEventID(),
@@ -95,11 +97,11 @@ func (w *WebhookNotifier) NotifyNetworkErrors(agentID string, iface *types.Inter
 		},
 	}
 
-	return w.sendWebhook(payload)
+	return n.sendWebhook(payload)
 }
 
 // NotifyHighNetworkUtilization sends a high network utilization notification
-func (w *WebhookNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
+func (n *WebhookNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
 	payload := WebhookPayload{
 		EventType: "network.high_utilization",
 		EventID:   generateEventID(),
@@ -118,11 +120,11 @@ func (w *WebhookNotifier) NotifyHighNetworkUtilization(agentID string, iface *ty
 		},
 	}
 
-	return w.sendWebhook(payload)
+	return n.sendWebhook(payload)
 }
 
 // NotifyIPChange sends IP change notification
-func (w *WebhookNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+func (n *WebhookNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
 	payload := WebhookPayload{
 		EventType: "ip.change",
 		EventID:   generateEventID(),
@@ -143,31 +145,31 @@ func (w *WebhookNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.I
 		},
 	}
 
-	return w.sendWebhook(payload)
+	return n.sendWebhook(payload)
 }
 
 // sendWebhook sends a webhook
-func (w *WebhookNotifier) sendWebhook(payload WebhookPayload) error {
+func (n *WebhookNotifier) sendWebhook(payload WebhookPayload) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
 	// Add common data from config
-	if w.config.CommonData != nil {
-		for k, v := range w.config.CommonData {
+	if n.config.CommonData != nil {
+		for k, v := range n.config.CommonData {
 			payload.Data.(map[string]any)[k] = v
 		}
 	}
 
 	// Calculate signature if secret is configured
 	signature := ""
-	if w.config.Secret != "" {
-		signature = calculateSignature(data, []byte(w.config.Secret))
+	if n.config.Secret != "" {
+		signature = calculateSignature(data, []byte(n.config.Secret))
 	}
 
 	// Create request
-	req, err := http.NewRequest(http.MethodPost, w.config.URL, bytes.NewBuffer(data))
+	req, err := http.NewRequest(http.MethodPost, n.config.URL, bytes.NewBuffer(data))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -183,27 +185,34 @@ func (w *WebhookNotifier) sendWebhook(payload WebhookPayload) error {
 	}
 
 	// Add custom headers from config
-	for k, v := range w.config.Headers {
+	for k, v := range n.config.Headers {
 		req.Header.Set(k, v)
 	}
 
 	// Send request with retry
 	var resp *http.Response
-	for attempt := 1; attempt <= w.config.MaxRetries; attempt++ {
-		resp, err = w.client.Do(req)
+	for attempt := 1; attempt <= n.config.MaxRetries; attempt++ {
+		resp, err = n.client.Do(req)
 		if err == nil && resp.StatusCode < 500 {
 			break
 		}
 
-		if attempt < w.config.MaxRetries {
+		if attempt < n.config.MaxRetries {
 			time.Sleep(calculateBackoff(attempt))
 		}
 	}
 
 	if err != nil {
-		return fmt.Errorf("failed to send webhook after %d attempts: %w", w.config.MaxRetries, err)
+		return fmt.Errorf("failed to send webhook after %d attempts: %w", n.config.MaxRetries, err)
 	}
-	defer resp.Body.Close()
+
+	if resp == nil {
+		return fmt.Errorf("failed to send webhook after %d attempts: no response", n.config.MaxRetries)
+	}
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("webhook request failed with status %d", resp.StatusCode)
@@ -253,4 +262,10 @@ func randomBytes(n int) []byte {
 		panic(err)
 	}
 	return b
+}
+
+// Health checks the health of the notifier
+func (n *WebhookNotifier) Health(_ context.Context) error {
+	// Note: Add health check logic here
+	return nil
 }

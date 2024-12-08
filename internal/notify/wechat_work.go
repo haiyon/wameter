@@ -2,8 +2,10 @@ package notify
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -209,7 +211,10 @@ func (w *WeChatNotifier) sendMarkdown(content string) error {
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	var result struct {
 		ErrCode int    `json:"errcode"`
@@ -230,5 +235,11 @@ func (w *WeChatNotifier) sendMarkdown(content string) error {
 		return fmt.Errorf("wechat api error: %s", result.ErrMsg)
 	}
 
+	return nil
+}
+
+// Health checks the health of the notifier
+func (n *WeChatNotifier) Health(_ context.Context) error {
+	// Note: Add health check logic here
 	return nil
 }

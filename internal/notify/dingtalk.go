@@ -2,11 +2,13 @@ package notify
 
 import (
 	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"time"
@@ -66,39 +68,39 @@ func NewDingTalkNotifier(cfg *config.DingTalkConfig, loader *ntpl.Loader, logger
 }
 
 // NotifyAgentOffline sends agent offline notification
-func (d *DingTalkNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
+func (n *DingTalkNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
-	return d.sendTemplate("agent_offline", data, "Agent Offline Alert")
+	return n.sendTemplate("agent_offline", data, "Agent Offline Alert")
 }
 
 // NotifyNetworkErrors sends network errors notification
-func (d *DingTalkNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
+func (n *DingTalkNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-	return d.sendTemplate("network_error", data, "Network Errors Alert")
+	return n.sendTemplate("network_error", data, "Network Errors Alert")
 }
 
 // NotifyHighNetworkUtilization sends high network utilization notification
-func (d *DingTalkNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
+func (n *DingTalkNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-	return d.sendTemplate("high_utilization", data, "High Network Utilization Alert")
+	return n.sendTemplate("high_utilization", data, "High Network Utilization Alert")
 }
 
 // NotifyIPChange sends IP change notification
-func (d *DingTalkNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+func (n *DingTalkNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
 	data := map[string]any{
 		"Agent":         agent,
 		"Change":        change,
@@ -109,12 +111,12 @@ func (d *DingTalkNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.
 		"NewAddrs":      change.NewAddrs,
 		"InterfaceName": change.InterfaceName,
 	}
-	return d.sendTemplate("ip_change", data, "markdown")
+	return n.sendTemplate("ip_change", data, "markdown")
 }
 
 // sendTemplate sends DingTalk message
-func (d *DingTalkNotifier) sendTemplate(templateName string, data map[string]any, title string) error {
-	tmpl, err := d.tplLoader.GetTemplate(ntpl.DingTalk, templateName)
+func (n *DingTalkNotifier) sendTemplate(templateName string, data map[string]any, title string) error {
+	tmpl, err := n.tplLoader.GetTemplate(ntpl.DingTalk, templateName)
 	if err != nil {
 		return fmt.Errorf("failed to get template: %w", err)
 	}
@@ -124,11 +126,11 @@ func (d *DingTalkNotifier) sendTemplate(templateName string, data map[string]any
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	return d.send(title, content.String())
+	return n.send(title, content.String())
 }
 
 // send sends DingTalk message
-func (d *DingTalkNotifier) send(title, content string) error {
+func (n *DingTalkNotifier) send(title, content string) error {
 	msg := DingMessage{
 		MsgType: "markdown",
 		Markdown: DingMarkdown{
@@ -136,9 +138,9 @@ func (d *DingTalkNotifier) send(title, content string) error {
 			Text:  content,
 		},
 		At: DingAt{
-			AtMobiles: d.config.AtMobiles,
-			AtUserIds: d.config.AtUserIds,
-			IsAtAll:   d.config.AtAll,
+			AtMobiles: n.config.AtMobiles,
+			AtUserIds: n.config.AtUserIds,
+			IsAtAll:   n.config.AtAll,
 		},
 	}
 
@@ -148,18 +150,21 @@ func (d *DingTalkNotifier) send(title, content string) error {
 	}
 
 	// Generate signature if secret is configured
-	webhook := fmt.Sprintf("https://oapi.dingtalk.com/robot/send?access_token=%s", d.config.AccessToken)
-	if d.config.Secret != "" {
+	webhook := fmt.Sprintf("https://oapi.dingtalk.com/robot/send?access_token=%s", n.config.AccessToken)
+	if n.config.Secret != "" {
 		timestamp := time.Now().UnixMilli()
-		sign := d.generateSignature(timestamp)
+		sign := n.generateSignature(timestamp)
 		webhook = fmt.Sprintf("%s&timestamp=%d&sign=%s", webhook, timestamp, url.QueryEscape(sign))
 	}
 
-	resp, err := d.client.Post(webhook, "application/json", bytes.NewBuffer(payload))
+	resp, err := n.client.Post(webhook, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
 
 	var result struct {
 		ErrCode int    `json:"errcode"`
@@ -177,9 +182,15 @@ func (d *DingTalkNotifier) send(title, content string) error {
 }
 
 // generateSignature generates signature
-func (d *DingTalkNotifier) generateSignature(timestamp int64) string {
-	stringToSign := fmt.Sprintf("%d\n%s", timestamp, d.config.Secret)
-	hmac256 := hmac.New(sha256.New, []byte(d.config.Secret))
+func (n *DingTalkNotifier) generateSignature(timestamp int64) string {
+	stringToSign := fmt.Sprintf("%d\n%s", timestamp, n.config.Secret)
+	hmac256 := hmac.New(sha256.New, []byte(n.config.Secret))
 	hmac256.Write([]byte(stringToSign))
 	return base64.StdEncoding.EncodeToString(hmac256.Sum(nil))
+}
+
+// Health checks the health of the notifier
+func (n *DingTalkNotifier) Health(_ context.Context) error {
+	// Note: Add health check logic here
+	return nil
 }
