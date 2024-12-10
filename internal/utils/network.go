@@ -154,6 +154,11 @@ func IsPhysicalInterface(name string, flags net.Flags) bool {
 
 // GetInterfaceStats retrieves interface statistics
 func GetInterfaceStats(name string) (*types.InterfaceStats, error) {
+	// Only supported on Linux
+	if !IsLinux() {
+		return nil, nil
+	}
+
 	stats := &types.InterfaceStats{
 		CollectedAt: time.Now(),
 	}
@@ -170,13 +175,8 @@ func GetInterfaceStats(name string) (*types.InterfaceStats, error) {
 	stats.Speed = getInterfaceSpeed(name)
 	stats.HasCarrier = hasCarrier(name)
 
-	// Get detailed statistics on Linux
-	if isLinux() {
-		if err := getLinuxStats(name, stats); err != nil {
-			return nil, err
-		}
-	} else {
-		return nil, fmt.Errorf("unsupported OS")
+	if err := getLinuxStats(name, stats); err != nil {
+		return nil, err
 	}
 
 	return stats, nil
@@ -218,12 +218,8 @@ func FormatBytesRate(bytesPerSec float64) string {
 		bytesPerSec/div, "KMGTPE"[exp])
 }
 
-func isLinux() bool {
-	return os.PathSeparator == '/'
-}
-
 func getOperState(name string) string {
-	if !isLinux() {
+	if !IsLinux() {
 		return ""
 	}
 
@@ -235,7 +231,7 @@ func getOperState(name string) string {
 }
 
 func getInterfaceSpeed(name string) int64 {
-	if !isLinux() {
+	if !IsLinux() {
 		return 0
 	}
 
@@ -252,7 +248,7 @@ func getInterfaceSpeed(name string) int64 {
 }
 
 func hasCarrier(name string) bool {
-	if !isLinux() {
+	if !IsLinux() {
 		return false
 	}
 

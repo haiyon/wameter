@@ -114,6 +114,10 @@ func (s *statsCollector) collect() error {
 			continue
 		}
 
+		if stats == nil {
+			continue
+		}
+
 		// Calculate rates if we have previous stats
 		if prevStats, exists := s.prevStats[iface.Name]; exists {
 			duration := stats.CollectedAt.Sub(prevStats.CollectedAt).Seconds()
@@ -131,7 +135,7 @@ func (s *statsCollector) collect() error {
 	return nil
 }
 
-// Helper function to check if interface should be monitored
+// shouldMonitorInterface returns true if the interface should be monitored
 func shouldMonitorInterface(name string, flags net.Flags, config *config.NetworkConfig) bool {
 	// Check exclusion patterns
 	for _, pattern := range config.ExcludePatterns {

@@ -248,6 +248,13 @@ func (c *networkCollector) collectInterfaces(state *types.NetworkState) error {
 			}
 		}
 
+		// Get interfaces statistics, only record if there are valid statistics
+		if stats := c.stats.GetStats(); stats != nil {
+			if ifaceStats, ok := stats[iface.Name]; ok && ifaceStats != nil {
+				info.Statistics = ifaceStats
+			}
+		}
+
 		addrs, err := iface.Addrs()
 		if err != nil {
 			c.logger.Warn("Failed to get addresses",
