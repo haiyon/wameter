@@ -310,23 +310,32 @@ func (r *agentRepository) GetAgentMetrics(ctx context.Context, id string) (*type
 		Join("INNER", "agents a", "m.agent_id = a.id").
 		Where("m.agent_id = ?", id)
 
+	var lastDowntime sql.NullTime
 	err := r.db.QueryRowContext(ctx, qb.SQL(), qb.Args()...).Scan(
 		&metrics.TotalCollections,
 		&metrics.FailedCollections,
-		&metrics.LastDowntime,
+		&lastDowntime,
 	)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// No metrics found, return empty
+			return metrics, nil
+		}
 		return nil, fmt.Errorf("failed to get agent metrics: %w", err)
 	}
 
-	// Calculate uptime percentage
+	if lastDowntime.Valid {
+		metrics.LastDowntime = lastDowntime.Time
+	}
+
+	// Calculate uptime percentage if we have collections
 	if metrics.TotalCollections > 0 {
 		metrics.UptimePercent = float64(metrics.TotalCollections-metrics.FailedCollections) / float64(metrics.TotalCollections) * 100
 	}
 
 	// Get network statistics
 	if err := r.getAgentNetworkStats(ctx, id, metrics); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get network stats: %w", err)
 	}
 
 	return metrics, nil
@@ -335,22 +344,48 @@ func (r *agentRepository) GetAgentMetrics(ctx context.Context, id string) (*type
 // getAgentNetworkStats retrieves network statistics for an agent
 func (r *agentRepository) getAgentNetworkStats(ctx context.Context, id string, metrics *types.AgentMetrics) error {
 	qb := database.NewQueryBuilder(r.db.Driver())
+
+	// Build query
+	var jsonQuery string
+	switch r.db.Driver() {
+	case "postgres":
+		jsonQuery = "data->'metrics'->'network'"
+	case "mysql":
+		jsonQuery = "JSON_EXTRACT(data, '$.metrics.network')"
+	case "sqlite":
+		jsonQuery = "json_extract(data, '$.metrics.network')"
+	default:
+		return fmt.Errorf("unsupported database driver: %s", r.db.Driver())
+	}
+
 	qb.Select(
-		"COUNT(DISTINCT data->'metrics'->'network'->'interfaces') as interface_count",
-		"SUM(CAST(data->'metrics'->'network'->'total_bandwidth' AS BIGINT)) as total_bandwidth",
-		"AVG(CAST(data->'metrics'->'network'->'error_rate' AS FLOAT)) as error_rate",
+		fmt.Sprintf("COUNT(DISTINCT %s->'interfaces') as interface_count", jsonQuery),
+		fmt.Sprintf("SUM(CAST(%s->'total_bandwidth' AS BIGINT)) as total_bandwidth", jsonQuery),
+		fmt.Sprintf("AVG(CAST(%s->'error_rate' AS FLOAT)) as error_rate", jsonQuery),
 	).
 		From("metrics").
 		Where("agent_id = ?", id).
-		Where("data->'metrics'->>'network' IS NOT NULL")
+		Where(fmt.Sprintf("%s IS NOT NULL", jsonQuery))
+
+	var totalBandwidth sql.NullInt64
+	var errorRate sql.NullFloat64
 
 	err := r.db.QueryRowContext(ctx, qb.SQL(), qb.Args()...).Scan(
 		&metrics.NetworkStats.InterfaceCount,
-		&metrics.NetworkStats.TotalBandwidth,
-		&metrics.NetworkStats.ErrorRate,
+		&totalBandwidth,
+		&errorRate,
 	)
+
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("failed to get agent network stats: %w", err)
+		return fmt.Errorf("failed to get network stats: %w", err)
+	}
+
+	if totalBandwidth.Valid {
+		metrics.NetworkStats.TotalBandwidth = uint64(totalBandwidth.Int64)
+	}
+
+	if errorRate.Valid {
+		metrics.NetworkStats.ErrorRate = errorRate.Float64
 	}
 
 	return nil

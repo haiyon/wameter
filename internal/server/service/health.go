@@ -114,6 +114,9 @@ func (s *Service) HealthCheck(ctx context.Context) *types.HealthStatus {
 
 // GetServiceMetrics returns service metrics
 func (s *Service) GetServiceMetrics(_ context.Context) *types.ServiceMetrics {
+	s.statsMu.RLock()
+	defer s.statsMu.RUnlock()
+
 	metrics := &types.ServiceMetrics{
 		StartTime:  s.startTime,
 		SystemInfo: s.collectSystemStats(),

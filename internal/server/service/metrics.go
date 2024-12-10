@@ -162,7 +162,11 @@ func (s *Service) exportMetricsJSON(metrics []*types.MetricsData) (io.Reader, er
 	go func() {
 		encoder := json.NewEncoder(pw)
 		err := encoder.Encode(metrics)
-		_ = pw.CloseWithError(err)
+		if err != nil {
+			_ = pw.CloseWithError(err)
+			return
+		}
+		_ = pw.Close()
 	}()
 
 	return pr, nil
