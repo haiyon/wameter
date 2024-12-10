@@ -169,11 +169,9 @@ func run(ctx context.Context, cfg *config.Config, logger *zap.Logger) error {
 
 	// Start server in background
 	go func() {
-		select {
-		case <-ctx.Done():
-			if err := server.Shutdown(context.Background()); err != nil {
-				logger.Error("Server shutdown error", zap.Error(err))
-			}
+		<-ctx.Done()
+		if err := server.Shutdown(context.Background()); err != nil {
+			logger.Error("Server shutdown error", zap.Error(err))
 		}
 	}()
 
