@@ -155,11 +155,6 @@ func (h *Handler) registerAgent(ctx context.Context) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("failed to register agent: status=%d body=%s", resp.StatusCode, string(body))
 	}
-
-	h.logger.Info("Agent registered successfully",
-		zap.String("id", h.config.Agent.ID),
-		zap.String("hostname", hostname))
-
 	return nil
 }
 
@@ -236,8 +231,6 @@ func (h *Handler) sendHeartbeat(ctx context.Context) error {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("heartbeat failed: status=%d body=%s", resp.StatusCode, string(body))
 	}
-
-	h.logger.Debug("Heartbeat sent successfully")
 	return nil
 }
 

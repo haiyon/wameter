@@ -33,66 +33,77 @@ func (s *Service) RegisterAgent(ctx context.Context, agent *types.AgentInfo) err
 		return fmt.Errorf("invalid agent info: missing required fields")
 	}
 
+	// Add timeout if not set
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+		defer cancel()
+	}
+
+	// Lock agent map
+	s.agentsMu.Lock()
+	defer s.agentsMu.Unlock()
+
 	// Check if agent already exists
 	existing, err := s.agentRepo.FindByID(ctx, agent.ID)
 	if err != nil && !errors.Is(err, types.ErrAgentNotFound) {
 		return fmt.Errorf("failed to check existing agent: %w", err)
 	}
 
-	// Set initial values
-	if agent.RegisteredAt.IsZero() {
-		agent.RegisteredAt = time.Now()
+	// Update existing agent
+	if existing != nil {
+		existing.Hostname = agent.Hostname
+		existing.Version = agent.Version
+		existing.Status = types.AgentStatusOnline
+		existing.LastSeen = time.Now()
+		existing.UpdatedAt = time.Now()
+
+		if err := s.agentRepo.UpdateAgent(ctx, existing); err != nil {
+			return fmt.Errorf("failed to update existing agent: %w", err)
+		}
+		s.agents[existing.ID] = existing
+		return nil
 	}
-	if agent.Status == "" {
-		agent.Status = types.AgentStatusOnline
-	}
+
+	// Create new agent
+	agent.RegisteredAt = time.Now()
 	agent.UpdatedAt = time.Now()
 	agent.LastSeen = time.Now()
+	agent.Status = types.AgentStatusOnline
 
-	if existing != nil {
-		// Update agent
-		return s.UpdateAgent(ctx, agent)
-	}
-
-	// Save to repository
+	// Save in repository
 	if err := s.agentRepo.Save(ctx, agent); err != nil {
-		return fmt.Errorf("failed to save agent: %w", err)
+		return fmt.Errorf("failed to save new agent: %w", err)
 	}
 
-	// Update internal state
-	s.agentsMu.Lock()
+	// Update agent in memory
 	s.agents[agent.ID] = agent
-	s.agentsMu.Unlock()
-
-	s.logger.Info("Agent registered",
-		zap.String("id", agent.ID),
-		zap.String("hostname", agent.Hostname),
-		zap.String("version", agent.Version))
-
 	return nil
 }
 
 // UpdateAgent updates existing agent
 func (s *Service) UpdateAgent(ctx context.Context, agent *types.AgentInfo) error {
-	// Verify agent exists
+	// Lock agent map
+	s.agentsMu.Lock()
+	defer s.agentsMu.Unlock()
+
+	// Check if agent already exists
 	existing, err := s.agentRepo.FindByID(ctx, agent.ID)
-	if err != nil {
-		return fmt.Errorf("failed to find agent: %w", err)
+	if err != nil && !errors.Is(err, types.ErrAgentNotFound) {
+		return fmt.Errorf("failed to check existing agent: %w", err)
 	}
 
-	// Preserve certain fields
+	// If agent doesn't exist, fetch it from the repository
 	agent.RegisteredAt = existing.RegisteredAt
 	agent.UpdatedAt = time.Now()
 
 	// Update in repository
-	if err := s.agentRepo.Save(ctx, agent); err != nil {
+	if err := s.agentRepo.UpdateAgent(ctx, agent); err != nil {
 		return fmt.Errorf("failed to update agent: %w", err)
 	}
 
 	// Update internal state
-	s.agentsMu.Lock()
 	s.agents[agent.ID] = agent
-	s.agentsMu.Unlock()
 
 	return nil
 }
@@ -139,27 +150,38 @@ func (s *Service) DeleteAgent(ctx context.Context, agentID string) error {
 
 // UpdateAgentStatus updates agent status
 func (s *Service) UpdateAgentStatus(ctx context.Context, agentID string, status types.AgentStatus) error {
-	agent, err := s.GetAgent(ctx, agentID)
-	if err != nil {
-		return err
+	// Lock agent map
+	s.agentsMu.Lock()
+	defer s.agentsMu.Unlock()
+
+	// Check if agent exists
+	agent, exists := s.agents[agentID]
+	if !exists {
+		// If agent doesn't exist, fetch it from the repository
+		var err error
+		agent, err = s.agentRepo.FindByID(ctx, agentID)
+		if err != nil {
+			if errors.Is(err, types.ErrAgentNotFound) {
+				return fmt.Errorf("agent not found: %s", agentID)
+			}
+			return fmt.Errorf("failed to find agent: %w", err)
+		}
 	}
 
-	// Update status
+	// Update agent
 	agent.Status = status
 	agent.UpdatedAt = time.Now()
 	if status == types.AgentStatusOnline {
 		agent.LastSeen = time.Now()
 	}
 
-	// Update in repository
+	// Update status in repository
 	if err := s.agentRepo.UpdateStatus(ctx, agentID, status); err != nil {
-		return fmt.Errorf("failed to update agent status: %w", err)
+		return fmt.Errorf("failed to update agent status in database: %w", err)
 	}
 
-	// Update internal state
-	s.agentsMu.Lock()
+	// Update agent in memory
 	s.agents[agentID] = agent
-	s.agentsMu.Unlock()
 
 	// Send notification if agent went offline
 	if status == types.AgentStatusOffline {
@@ -329,16 +351,23 @@ func (s *Service) checkAgentStatuses() {
 
 	for id, agent := range s.agents {
 		if agent.Status == types.AgentStatusOnline && now.Sub(agent.LastSeen) > offlineThreshold {
+			// Update agent status
 			agent.Status = types.AgentStatusOffline
-
-			if err := s.agentRepo.UpdateStatus(context.Background(),
-				id, types.AgentStatusOffline); err != nil {
-				s.logger.Error("Failed to update agent status",
+			agent.UpdatedAt = now
+			// Update agent status in repository
+			if err := s.agentRepo.UpdateStatus(context.Background(), id, types.AgentStatusOffline); err != nil {
+				s.logger.Error("Failed to update agent offline status",
 					zap.Error(err),
 					zap.String("agent_id", id))
+				continue
 			}
 
-			s.notifier.NotifyAgentOffline(agent)
+			// Update agent in memory
+			s.agents[id] = agent
+
+			if s.notifier != nil {
+				s.notifier.NotifyAgentOffline(agent)
+			}
 		}
 	}
 }
