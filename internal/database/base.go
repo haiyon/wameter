@@ -410,8 +410,8 @@ func (d *Database) StopPruning() error {
 }
 
 // Unwrap returns the underlying database connection
-func (d *Database) Unwrap() (*sql.DB, error) {
-	return d.db, nil
+func (d *Database) Unwrap() *sql.DB {
+	return d.db
 }
 
 // recordMetrics safely records operation metrics

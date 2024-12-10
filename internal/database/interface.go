@@ -43,5 +43,5 @@ type Interface interface {
 	Cleanup(ctx context.Context, before time.Time) error
 	RunPruning(ctx context.Context) error
 	StopPruning() error
-	Unwrap() (*sql.DB, error)
+	Unwrap() *sql.DB
 }

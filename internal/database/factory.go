@@ -2,7 +2,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,6 +18,26 @@ func New(cfg *config.DatabaseConfig, logger *zap.Logger) (Interface, error) {
 		return nil, fmt.Errorf("invalid database config: %w", err)
 	}
 
+	// Create a new database instance
+	db, err := newInstance(cfg, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
+	}
+
+	// Run migrations
+	if cfg.AutoMigrate {
+		if err := runMigrations(cfg, logger); err != nil {
+			logger.Error("Failed to run migrations", zap.Error(err))
+			return nil, err
+		}
+	}
+
+	return db, nil
+}
+
+// newInstance creates new database instance based on configuration
+func newInstance(cfg *config.DatabaseConfig, logger *zap.Logger) (Interface, error) {
+	// Set options
 	opts := Options{
 		MaxOpenConns:       cfg.MaxConnections,
 		MaxIdleConns:       cfg.MaxIdleConns,
@@ -34,45 +53,29 @@ func New(cfg *config.DatabaseConfig, logger *zap.Logger) (Interface, error) {
 		SlowQueryThreshold: cfg.SlowQueryTime,
 	}
 
-	var dbi Interface
-	var err error
-
+	// Create instance
 	switch cfg.Driver {
 	case "sqlite":
-		dbi, err = NewSQLiteDatabase(cfg.DSN, opts, logger)
+		return NewSQLiteDatabase(cfg.DSN, opts, logger)
 	case "mysql":
-		dbi, err = NewMySQLDatabase(cfg.DSN, opts, logger)
+		return NewMySQLDatabase(cfg.DSN, opts, logger)
 	case "postgres":
-		dbi, err = NewPostgresDatabase(cfg.DSN, opts, logger)
+		return NewPostgresDatabase(cfg.DSN, opts, logger)
 	default:
 		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Driver)
 	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize database: %w", err)
-	}
-
-	// Run migrations
-	if cfg.AutoMigrate {
-		if err := runMigrations(cfg, logger); err != nil {
-			logger.Error("Failed to run migrations", zap.Error(err))
-			return nil, err
-		}
-	}
-
-	return dbi, nil
 }
 
 // runMigrations runs database migrations based on the configuration
 func runMigrations(cfg *config.DatabaseConfig, logger *zap.Logger) error {
 	// Create a new database connection for migrations
-	sqlDB, err := sql.Open(cfg.Driver, cfg.DSN)
+	db, err := newInstance(cfg, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create database connection for migrations: %w", err)
 	}
 
 	defer func() {
-		_ = sqlDB.Close()
+		_ = db.Close()
 	}()
 
 	// Verify migrations path
@@ -89,7 +92,7 @@ func runMigrations(cfg *config.DatabaseConfig, logger *zap.Logger) error {
 	cfg.MigrationsPath = driverPath
 
 	// Create migrator instance
-	migrator, err := migration.NewMigrator(sqlDB, cfg, logger)
+	migrator, err := migration.NewMigrator(db.Unwrap(), cfg, logger)
 	if err != nil {
 		return fmt.Errorf("failed to create migrator: %w", err)
 	}
