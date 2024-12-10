@@ -380,11 +380,11 @@ func (s *Service) DeleteMetrics(ctx context.Context, before time.Time) error {
 	return s.metricsRepo.DeleteBefore(ctx, before)
 }
 
-// archiveMetricsData handles actual archiving of metrics data
-func (s *Service) archiveMetricsData(metrics []*types.MetricsData) error {
-	// Implement archiving strategy (e.g., to S3, local file, etc.)
-	return fmt.Errorf("metrics archiving not implemented")
-}
+// // archiveMetricsData handles actual archiving of metrics data
+// func (s *Service) archiveMetricsData(metrics []*types.MetricsData) error {
+// 	// Implement archiving strategy (e.g., to S3, local file, etc.)
+// 	return fmt.Errorf("metrics archiving not implemented")
+// }
 
 // processNetworkMetrics processes network metrics
 func (s *Service) processNetworkMetrics(ctx context.Context, data *types.MetricsData) {
@@ -430,32 +430,6 @@ func (s *Service) processNetworkMetrics(ctx context.Context, data *types.Metrics
 			s.notifier.NotifyHighNetworkUtilization(data.AgentID, iface)
 		}
 	}
-}
-
-// processIPChanges handles IP changes
-func (s *Service) processIPChanges(ctx context.Context, data *types.MetricsData) error {
-	s.agentsMu.RLock()
-	agent, exists := s.agents[data.AgentID]
-	s.agentsMu.RUnlock()
-
-	if !exists {
-		return fmt.Errorf("agent not found: %s", data.AgentID)
-	}
-
-	for _, change := range data.Metrics.Network.IPChanges {
-		// Save change
-		if err := s.ipChangeRepo.Save(ctx, data.AgentID, &change); err != nil {
-			s.logger.Error("Failed to save IP change",
-				zap.Error(err),
-				zap.String("agent_id", data.AgentID))
-			continue
-		}
-
-		// Send notification
-		s.notifier.NotifyIPChange(agent, &change)
-	}
-
-	return nil
 }
 
 // processMetricsAlerts processes metrics for alerts

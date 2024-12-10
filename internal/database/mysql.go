@@ -91,20 +91,22 @@ func (d *MySQLDatabase) BatchExec(ctx context.Context, query string, args [][]an
 
 // batchInsert handles MySQL batch inserts efficiently
 func (d *MySQLDatabase) batchInsert(ctx context.Context, query string, args [][]any) error {
+	// Find "VALUES" keyword in query
 	idx := strings.Index(strings.ToUpper(query), "VALUES")
 	if idx == -1 {
 		return fmt.Errorf("invalid INSERT query format")
 	}
 
-	baseQuery := query[:idx]
-	valueStr := query[idx+6:]
-	valueStr = strings.TrimSpace(valueStr)
-	valueStr = strings.Trim(valueStr, "()")
+	// Extract base query
+	baseQuery := strings.TrimSpace(query[:idx])
 
-	var allArgs []any
+	// Prepare placeholders and flatten arguments
 	placeholders := make([]string, len(args))
-
+	var allArgs []any
 	for i, arg := range args {
+		if len(arg) == 0 {
+			return fmt.Errorf("empty argument set for batch insert")
+		}
 		placeholders[i] = "(" + strings.Repeat("?,", len(arg)-1) + "?)"
 		allArgs = append(allArgs, arg...)
 	}

@@ -189,10 +189,10 @@ func (s *Service) applyConfigChanges(_ context.Context, cfg *config.Config, chan
 
 // updateDatabaseConnections updates database connection pool
 func (s *Service) updateDatabaseConnections(_ int) error {
-	if s.db != nil {
-		// Update database connection pool
-		// s.db.SetMaxOpenConns(maxConns)
-	}
+	// if s.db != nil {
+	// 	// Update database connection pool
+	// 	// s.db.SetMaxOpenConns(maxConns)
+	// }
 	return nil
 }
 

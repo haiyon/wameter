@@ -39,14 +39,23 @@ func NewMigrator(db *sql.DB, cfg *config.DatabaseConfig, logger *zap.Logger) (*M
 	switch cfg.Driver {
 	case "sqlite":
 		driver, err = sqlite3.WithInstance(db, &sqlite3.Config{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create sqlite driver: %w", err)
+		}
 		instance, err = migrate.NewWithDatabaseInstance("file://"+cfg.MigrationsPath, "sqlite3", driver)
 
 	case "mysql":
 		driver, err = mysql.WithInstance(db, &mysql.Config{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create mysql driver: %w", err)
+		}
 		instance, err = migrate.NewWithDatabaseInstance("file://"+cfg.MigrationsPath, "mysql", driver)
 
 	case "postgres":
 		driver, err = postgres.WithInstance(db, &postgres.Config{})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create postgres driver: %w", err)
+		}
 		instance, err = migrate.NewWithDatabaseInstance("file://"+cfg.MigrationsPath, "postgres", driver)
 
 	default:

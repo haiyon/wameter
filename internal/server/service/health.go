@@ -34,10 +34,6 @@ func (s *Service) StartHealthCheck(ctx context.Context) {
 				if !status.Healthy {
 					s.logger.Warn("Unhealthy status detected",
 						zap.Any("details", status.Details))
-
-					if s.notifier != nil {
-						// Add notification logic here
-					}
 				}
 			}
 		}
