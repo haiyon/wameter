@@ -1,5 +1,11 @@
 package config
 
+import "wameter/internal/logger"
+
+// LogConfig represents logging configuration
+// This is a copy of the logger.Config
+type LogConfig = logger.Config
+
 var (
 	// AppName is the name of the application
 	AppName = "wameter"

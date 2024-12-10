@@ -6,18 +6,16 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"wameter/internal/agent/collector"
 	"wameter/internal/agent/config"
 	"wameter/internal/agent/handler"
 	"wameter/internal/agent/notify"
 	"wameter/internal/agent/reporter"
+	"wameter/internal/logger"
 	"wameter/internal/version"
 
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func main() {
@@ -41,7 +39,7 @@ func main() {
 	}
 
 	// Initialize logger
-	logger, err := initLogger(cfg.Log)
+	logger, err := logger.New(cfg.Log)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
@@ -124,63 +122,4 @@ func main() {
 	}
 
 	logger.Info("Shutdown complete")
-}
-
-func initLogger(cfg config.LogConfig) (*zap.Logger, error) {
-	// Check if the log file path exists
-	_, err := os.Stat(cfg.File)
-	if os.IsNotExist(err) {
-		// Create the directory if it doesn't exist
-		if err := os.MkdirAll(filepath.Dir(cfg.File), 0755); err != nil {
-			return nil, fmt.Errorf("failed to create log directory: %w", err)
-		}
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to check log file path: %w", err)
-	}
-
-	// Configure log rotation
-	_ = &lumberjack.Logger{
-		Filename:   cfg.File,
-		MaxSize:    cfg.MaxSize,
-		MaxBackups: cfg.MaxBackups,
-		MaxAge:     cfg.MaxAge,
-		Compress:   cfg.Compress,
-	}
-
-	// Create logger config
-	zapCfg := zap.NewProductionConfig()
-	zapCfg.OutputPaths = []string{"stdout", cfg.File}
-	zapCfg.ErrorOutputPaths = []string{"stderr"}
-
-	// Set log level
-	var level zapcore.Level
-	switch cfg.Level {
-	case "debug":
-		level = zapcore.DebugLevel
-	case "info":
-		level = zapcore.InfoLevel
-	case "warn":
-		level = zapcore.WarnLevel
-	case "error":
-		level = zapcore.ErrorLevel
-	default:
-		level = zapcore.InfoLevel
-	}
-	zapCfg.Level = zap.NewAtomicLevelAt(level)
-
-	// Create encoder config
-	encoderConfig := zap.NewProductionEncoderConfig()
-	encoderConfig.TimeKey = "time"
-	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderConfig.EncodeDuration = zapcore.StringDurationEncoder
-
-	zapCfg.EncoderConfig = encoderConfig
-
-	// Create logger
-	logger := zap.Must(zapCfg.Build(
-		zap.AddCaller(),
-		zap.AddStacktrace(zapcore.ErrorLevel),
-	))
-
-	return logger.Named("agent"), nil
 }

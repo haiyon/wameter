@@ -1,11 +1,11 @@
-package config
+package logger
 
 import "fmt"
 
-// LogConfig represents logging configuration
-type LogConfig struct {
+// Config represents logging configuration
+type Config struct {
 	Directory    string `yaml:"directory"`
-	Filename     string `yaml:"filename"`
+	File         string `yaml:"file"`
 	MaxSize      int    `yaml:"max_size"` // MB
 	MaxBackups   int    `yaml:"max_backups"`
 	MaxAge       int    `yaml:"max_age"` // days
@@ -16,7 +16,7 @@ type LogConfig struct {
 }
 
 // Validate validates logging configuration
-func (cfg *LogConfig) Validate() error {
+func (cfg *Config) Validate() error {
 	if cfg.Directory == "" {
 		return fmt.Errorf("log directory cannot be empty")
 	}

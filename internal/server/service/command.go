@@ -179,6 +179,8 @@ func (s *Service) GetCommandHistory(_ context.Context, agentID string, limit int
 
 // monitorCommand monitors command execution and handles timeout
 func (s *Service) monitorCommand(ctx context.Context, agentID string, cmd types.Command) {
+	defer s.cleanupCommand(cmd.ID)
+
 	tracker := s.commands[cmd.ID]
 	var result types.CommandResult
 

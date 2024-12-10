@@ -79,7 +79,6 @@ func (m *Migrator) RunMigrations(ctx context.Context) error {
 		return errors.New("migrator not properly initialized")
 	}
 
-	m.logger.Info("Starting migrations...")
 	errChan := make(chan error, 1)
 
 	go func() {
@@ -99,7 +98,6 @@ func (m *Migrator) RunMigrations(ctx context.Context) error {
 			m.logger.Error("Migration failed", zap.Error(err))
 			return err
 		}
-		m.logger.Info("Migrations completed successfully")
 		return nil
 	}
 }

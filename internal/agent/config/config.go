@@ -15,7 +15,7 @@ type Config struct {
 	Agent     AgentConfig          `mapstructure:"agent"`
 	Collector CollectorConfig      `mapstructure:"collector"`
 	Notify    *config.NotifyConfig `mapstructure:"notify"`
-	Log       LogConfig            `mapstructure:"log"`
+	Log       *config.LogConfig    `mapstructure:"log"`
 }
 
 // AgentConfig represents agent configuration
@@ -108,34 +108,6 @@ func IPtrackerDefaultConfig() *IPTrackerConfig {
 		NotifyOnRemoval:   true,
 	}
 }
-
-// LogConfig represents logging configuration
-type LogConfig struct {
-	Level      string `mapstructure:"level"`
-	File       string `mapstructure:"file"`
-	MaxSize    int    `mapstructure:"max_size"`
-	MaxBackups int    `mapstructure:"max_backups"`
-	MaxAge     int    `mapstructure:"max_age"`
-	Compress   bool   `mapstructure:"compress"`
-}
-
-// Custom duration type for YAML parsing
-// type duration time.Duration
-
-// // UnmarshalText implements encoding.TextUnmarshaler
-// func (d *duration) UnmarshalText(text []byte) error {
-// 	dur, err := time.ParseDuration(string(text))
-// 	if err != nil {
-// 		return err
-// 	}
-// 	*d = duration(dur)
-// 	return nil
-// }
-//
-// // Duration Convert duration to time.Duration
-// func (d duration) Duration() time.Duration {
-// 	return time.Duration(d)
-// }
 
 // LoadConfig loads the agent configuration from file
 func LoadConfig(path string) (*Config, error) {

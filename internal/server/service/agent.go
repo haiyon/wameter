@@ -292,9 +292,9 @@ func (s *Service) loadAgents() {
 
 		offset += len(agents)
 
-		s.logger.Debug("Loaded agents batch",
-			zap.Int("batch_size", len(agents)),
-			zap.Int("total_loaded", total))
+		// s.logger.Debug("Loaded agents batch",
+		// 	zap.Int("batch_size", len(agents)),
+		// 	zap.Int("total_loaded", total))
 
 		// Check if context was canceled
 		if err := s.ctx.Err(); err != nil {

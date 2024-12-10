@@ -61,7 +61,6 @@ func (m *Manager) RegisterCollector(c Collector) error {
 	}
 
 	m.collectors[name] = c
-	m.logger.Info("Registered collector", zap.String("name", name))
 	return nil
 }
 

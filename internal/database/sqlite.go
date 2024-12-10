@@ -83,24 +83,21 @@ func (d *SQLiteDatabase) BatchExec(ctx context.Context, query string, args [][]a
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback()
-			panic(p)
-		}
-	}()
-
 	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
+		_ = tx.Rollback()
 		return err
 	}
 
-	defer func(stmt *sql.Stmt) {
+	defer func() {
 		_ = stmt.Close()
-	}(stmt)
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
 
 	for _, arg := range args {
-		if _, err := stmt.ExecContext(ctx, arg...); err != nil {
+		if _, err = stmt.ExecContext(ctx, arg...); err != nil {
 			return err
 		}
 	}

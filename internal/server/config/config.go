@@ -14,7 +14,7 @@ type Config struct {
 	Database DatabaseConfig       `mapstructure:"database"`
 	Notify   *config.NotifyConfig `mapstructure:"notify"`
 	API      APIConfig            `mapstructure:"api"`
-	Log      LogConfig            `mapstructure:"log"`
+	Log      *config.LogConfig    `mapstructure:"log"`
 }
 
 // Validate validates the configuration
@@ -204,23 +204,6 @@ func (cfg *DocsConfig) Validate() error {
 	if cfg.Path == "" {
 		return fmt.Errorf("docs path is required")
 	}
-	return nil
-}
-
-// LogConfig represents the logging configuration
-type LogConfig struct {
-	Level      string `mapstructure:"level"`
-	Format     string `mapstructure:"format"` // json, console
-	File       string `mapstructure:"file"`
-	MaxSize    int    `mapstructure:"max_size"` // MB
-	MaxBackups int    `mapstructure:"max_backups"`
-	MaxAge     int    `mapstructure:"max_age"` // days
-	Compress   bool   `mapstructure:"compress"`
-	Color      bool   `mapstructure:"color"`
-}
-
-// Validate logging configuration
-func (cfg *LogConfig) Validate() error {
 	return nil
 }
 

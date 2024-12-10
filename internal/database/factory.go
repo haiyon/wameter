@@ -108,17 +108,14 @@ func runMigrations(cfg *config.DatabaseConfig, logger *zap.Logger) error {
 
 	// Run migrations
 	if cfg.RollbackSteps > 0 {
-		logger.Info("Rolling back migrations", zap.Int("steps", cfg.RollbackSteps))
 		if err := migrator.RollbackMigrations(ctx, cfg.RollbackSteps); err != nil {
 			return fmt.Errorf("failed to rollback migrations: %w", err)
 		}
 	} else if cfg.TargetVersion > 0 {
-		logger.Info("Migrating to target version", zap.Int("target_version", cfg.TargetVersion))
 		if err := migrator.MigrateToVersion(ctx, uint(cfg.TargetVersion)); err != nil {
 			return fmt.Errorf("failed to migrate to target version: %w", err)
 		}
 	} else {
-		logger.Info("Running migrations to latest version")
 		if err := migrator.RunMigrations(ctx); err != nil {
 			return fmt.Errorf("failed to run migrations: %w", err)
 		}
