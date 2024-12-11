@@ -56,14 +56,9 @@ type IPState struct {
 
 // NetworkState represents the current state of network interfaces
 type NetworkState struct {
-	AgentID     string                    `json:"agent_id" validate:"required"`
-	Hostname    string                    `json:"hostname" validate:"required"`
-	Timestamp   time.Time                 `json:"timestamp" validate:"required"`
-	Interfaces  map[string]*InterfaceInfo `json:"interfaces" validate:"required,dive"`
-	ExternalIP  string                    `json:"external_ip,omitempty" validate:"omitempty,ip"`
-	CollectedAt time.Time                 `json:"collected_at" validate:"required"`
-	ReportedAt  time.Time                 `json:"reported_at" validate:"required"`
-	IPChanges   []IPChange                `json:"ip_changes,omitempty"`
+	Interfaces map[string]*InterfaceInfo `json:"interfaces" validate:"required,dive"`
+	ExternalIP string                    `json:"external_ip,omitempty" validate:"omitempty,ip"`
+	IPChanges  []IPChange                `json:"ip_changes,omitempty"`
 }
 
 // Validate performs validation of NetworkState

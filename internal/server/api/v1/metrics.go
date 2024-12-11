@@ -58,16 +58,6 @@ func (api *API) saveMetrics(c *gin.Context) {
 		resp.BadRequest(errors.New("hostname is required"))
 		return
 	}
-	if data.Metrics.Network != nil {
-		if data.Metrics.Network.AgentID == "" {
-			resp.BadRequest(errors.New("network.agent_id is required"))
-			return
-		}
-		if data.Metrics.Network.Hostname == "" {
-			resp.BadRequest(errors.New("network.hostname is required"))
-			return
-		}
-	}
 
 	// Set reported time
 	data.ReportedAt = time.Now()

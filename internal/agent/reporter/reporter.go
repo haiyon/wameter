@@ -134,12 +134,6 @@ func (r *Reporter) sendData(ctx context.Context, data *types.MetricsData) error 
 	// Set reported at
 	data.ReportedAt = time.Now()
 
-	if data.Metrics.Network != nil {
-		data.Metrics.Network.AgentID = r.config.Agent.ID
-		data.Metrics.Network.Hostname = data.Hostname
-		data.Metrics.Network.ReportedAt = data.ReportedAt
-	}
-
 	r.logger.Debug("Sending metrics data",
 		zap.String("agent_id", data.AgentID),
 		zap.String("hostname", data.Hostname),

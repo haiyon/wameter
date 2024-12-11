@@ -10,10 +10,10 @@ import (
 type Func func(ctx context.Context) error
 
 // LoggerFunc defines a logging function signature.
-type LoggerFunc func(format string, args ...interface{})
+type LoggerFunc func(format string, args ...any)
 
 // Default logger (can be replaced by a custom logger)
-var logger LoggerFunc = func(format string, args ...interface{}) {
+var logger LoggerFunc = func(format string, args ...any) {
 	fmt.Printf(format, args...)
 }
 

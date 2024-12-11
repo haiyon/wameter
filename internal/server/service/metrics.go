@@ -112,24 +112,11 @@ func (s *Service) GetMetrics(ctx context.Context, query MetricsQuery) ([]*types.
 
 // GetLatestMetrics returns the latest metrics for an agent
 func (s *Service) GetLatestMetrics(ctx context.Context, agentID string) (*types.MetricsData, error) {
-	// Verify agent exists
-	agent, err := s.agentRepo.FindByID(ctx, agentID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to find agent: %w", err)
-	}
-
 	// Get latest metrics
 	metrics, err := s.metricsRepo.GetLatest(ctx, agentID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest metrics: %w", err)
 	}
-
-	// Update with current agent status
-	if metrics.Metrics.Network != nil {
-		metrics.Metrics.Network.AgentID = agent.ID
-		metrics.Metrics.Network.Hostname = agent.Hostname
-	}
-
 	return metrics, nil
 }
 

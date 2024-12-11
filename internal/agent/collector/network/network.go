@@ -128,12 +128,7 @@ func (c *networkCollector) Collect(ctx context.Context) (*types.MetricsData, err
 	}
 
 	state := &types.NetworkState{
-		AgentID:     c.agentID,
-		Hostname:    hostname,
-		Timestamp:   time.Now(),
-		Interfaces:  make(map[string]*types.InterfaceInfo),
-		CollectedAt: time.Now(),
-		ReportedAt:  time.Now(),
+		Interfaces: make(map[string]*types.InterfaceInfo),
 	}
 
 	// Collect interface information
@@ -191,13 +186,14 @@ func (c *networkCollector) Collect(ctx context.Context) (*types.MetricsData, err
 	c.lastState = state
 	c.mu.Unlock()
 
+	now := time.Now()
 	return &types.MetricsData{
 		AgentID:     c.agentID,
 		Hostname:    hostname,
 		Version:     version.GetInfo().Version,
-		Timestamp:   state.Timestamp,
-		CollectedAt: state.CollectedAt,
-		ReportedAt:  time.Now(),
+		Timestamp:   now,
+		CollectedAt: now,
+		ReportedAt:  now,
 		Metrics: struct {
 			Network *types.NetworkState `json:"network,omitempty"`
 		}{
@@ -476,9 +472,6 @@ func (c *networkCollector) handleIPChanges(changes []types.IPChange) {
 				Network *types.NetworkState `json:"network,omitempty"`
 			}{
 				Network: &types.NetworkState{
-					AgentID:    c.agentID,
-					Hostname:   hostname,
-					Timestamp:  time.Now(),
 					IPChanges:  changes,
 					Interfaces: make(map[string]*types.InterfaceInfo),
 				},
