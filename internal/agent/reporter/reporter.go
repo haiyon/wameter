@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 	"wameter/internal/agent/config"
@@ -129,11 +128,7 @@ func (r *Reporter) sendData(ctx context.Context, data *types.MetricsData) error 
 
 	// Set hostname if not set
 	if data.Hostname == "" {
-		hostname, err := os.Hostname()
-		if err != nil {
-			return fmt.Errorf("failed to get hostname: %w", err)
-		}
-		data.Hostname = hostname
+		data.Hostname = r.config.Agent.Hostname
 	}
 
 	// Set reported at

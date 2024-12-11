@@ -3,7 +3,6 @@ package collector
 import (
 	"context"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 	"wameter/internal/agent/collector/network"
@@ -199,9 +198,7 @@ func (m *Manager) startCollectorLoop(ctx context.Context) {
 
 			// Ensure we have basic data fields
 			if data.Hostname == "" {
-				if hostname, err := os.Hostname(); err == nil {
-					data.Hostname = hostname
-				}
+				data.Hostname = m.config.Agent.Hostname
 			}
 
 			data.ReportedAt = time.Now()

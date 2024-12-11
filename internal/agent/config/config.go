@@ -7,6 +7,7 @@ import (
 	"time"
 	"wameter/internal/config"
 	"wameter/internal/retry"
+	"wameter/internal/utils"
 
 	"github.com/spf13/viper"
 )
@@ -160,7 +161,8 @@ func setDefaults(cfg *Config) {
 	}
 
 	if cfg.Agent.ID == "" {
-		cfg.Agent.ID = cfg.Agent.Hostname
+		// Generate a short hash of the hostname
+		cfg.Agent.ID = utils.ShortHash(cfg.Agent.Hostname)
 	}
 
 	if cfg.Agent.Port == 0 {

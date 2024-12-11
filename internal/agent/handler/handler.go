@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 	"wameter/internal/retry"
@@ -171,14 +170,9 @@ func (h *Handler) registerAgentWithRetry(ctx context.Context) error {
 
 // registerAgent registers the agent with the server
 func (h *Handler) registerAgent(ctx context.Context) error {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return fmt.Errorf("failed to get hostname: %w", err)
-	}
-
 	agent := &types.AgentInfo{
 		ID:       h.config.Agent.ID,
-		Hostname: hostname,
+		Hostname: h.config.Agent.Hostname,
 		Version:  version.GetInfo().Version,
 		Port:     h.config.Agent.Port,
 		Status:   types.AgentStatusOnline,

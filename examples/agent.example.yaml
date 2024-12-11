@@ -1,6 +1,6 @@
 # Wameter Agent Configuration Example
 agent:
-  id: ""  # Required, unique agent identifier, if not set will be hostname
+  id: ""  # Required, unique agent identifier, if not set will be hostname hashed
   hostname: "" # Optional, defaults to system hostname
   port: 8081  # Agent API port for commands
   # Heartbeat settings
