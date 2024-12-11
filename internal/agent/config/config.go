@@ -218,6 +218,7 @@ func setDefaults(cfg *Config) {
 			cfg.Retry.HourlyAttempts = 24
 		}
 		if cfg.Retry.HourlyInterval <= 0 {
+			cfg.Retry.HourlyInterval = time.Hour
 		}
 		if cfg.Retry.FinalRetryTimeout <= 0 {
 			cfg.Retry.FinalRetryTimeout = 48 * time.Hour
