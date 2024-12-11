@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"wameter/internal/server/api/response"
@@ -39,9 +40,12 @@ func (api *API) RegisterRoutes(r *gin.RouterGroup) {
 
 // healthCheck handles health check requests
 func (api *API) healthCheck(c *gin.Context) {
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
-	status := api.service.HealthCheck(c.Request.Context())
+	status := api.service.HealthCheck(ctx)
 	if !status.Healthy {
 		resp.Error(http.StatusServiceUnavailable, errors.New("service unhealthy"))
 		return

@@ -163,7 +163,9 @@ func (n *DingTalkNotifier) send(title, content string) error {
 	}
 
 	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
+		if err := Body.Close(); err != nil {
+			n.logger.Error("Failed to close response body", zap.Error(err))
+		}
 	}(resp.Body)
 
 	var result struct {

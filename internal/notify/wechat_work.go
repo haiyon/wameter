@@ -78,15 +78,20 @@ func NewWeChatNotifier(cfg *config.WeChatConfig, loader *ntpl.Loader, logger *za
 }
 
 // refreshToken refreshes the WeChat token
-func (w *WeChatNotifier) refreshToken() error {
+func (n *WeChatNotifier) refreshToken() error {
 	url := fmt.Sprintf("https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=%s&corpsecret=%s",
-		w.config.CorpID, w.config.Secret)
+		n.config.CorpID, n.config.Secret)
 
-	resp, err := w.client.Get(url)
+	resp, err := n.client.Get(url)
 	if err != nil {
 		return fmt.Errorf("failed to get token: %w", err)
 	}
-	defer resp.Body.Close()
+
+	defer func(Body io.ReadCloser) {
+		if err := Body.Close(); err != nil {
+			n.logger.Error("Failed to close response body", zap.Error(err))
+		}
+	}(resp.Body)
 
 	var tokenResp WeChatTokenResponse
 	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
@@ -97,17 +102,17 @@ func (w *WeChatNotifier) refreshToken() error {
 		return fmt.Errorf("wechat api error: %s", tokenResp.ErrMsg)
 	}
 
-	w.tokenMu.Lock()
-	w.token = tokenResp.AccessToken
-	w.tokenMu.Unlock()
+	n.tokenMu.Lock()
+	n.token = tokenResp.AccessToken
+	n.tokenMu.Unlock()
 
 	// Schedule token refresh
-	if w.tokenTimer != nil {
-		w.tokenTimer.Stop()
+	if n.tokenTimer != nil {
+		n.tokenTimer.Stop()
 	}
-	w.tokenTimer = time.AfterFunc(time.Duration(tokenResp.ExpiresIn)*time.Second*4/5, func() {
-		if err := w.refreshToken(); err != nil {
-			w.logger.Error("Failed to refresh WeChat token", zap.Error(err))
+	n.tokenTimer = time.AfterFunc(time.Duration(tokenResp.ExpiresIn)*time.Second*4/5, func() {
+		if err := n.refreshToken(); err != nil {
+			n.logger.Error("Failed to refresh WeChat token", zap.Error(err))
 		}
 	})
 
@@ -115,39 +120,39 @@ func (w *WeChatNotifier) refreshToken() error {
 }
 
 // NotifyAgentOffline sends agent offline notification
-func (w *WeChatNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
+func (n *WeChatNotifier) NotifyAgentOffline(agent *types.AgentInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"Agent":     agent,
 		"Timestamp": time.Now(),
 	}
-	return w.sendTemplate("agent_offline", data, "markdown")
+	return n.sendTemplate("agent_offline", data, "markdown")
 }
 
 // NotifyNetworkErrors sends network errors notification
-func (w *WeChatNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
+func (n *WeChatNotifier) NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-	return w.sendTemplate("network_error", data, "markdown")
+	return n.sendTemplate("network_error", data, "markdown")
 }
 
 // NotifyHighNetworkUtilization sends high network utilization notification
-func (w *WeChatNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
+func (n *WeChatNotifier) NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error {
 	// Prepare data
 	data := map[string]any{
 		"AgentID":   agentID,
 		"Interface": iface,
 		"Timestamp": time.Now(),
 	}
-	return w.sendTemplate("high_utilization", data, "markdown")
+	return n.sendTemplate("high_utilization", data, "markdown")
 }
 
 // NotifyIPChange sends IP change notification
-func (w *WeChatNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
+func (n *WeChatNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error {
 	data := map[string]any{
 		"Agent":         agent,
 		"Change":        change,
@@ -158,12 +163,12 @@ func (w *WeChatNotifier) NotifyIPChange(agent *types.AgentInfo, change *types.IP
 		"NewAddrs":      change.NewAddrs,
 		"InterfaceName": change.InterfaceName,
 	}
-	return w.sendTemplate("ip_change", data, "markdown")
+	return n.sendTemplate("ip_change", data, "markdown")
 }
 
 // sendTemplate sends WeChat message
-func (w *WeChatNotifier) sendTemplate(templateName string, data map[string]any, format ...string) error {
-	tmpl, err := w.tplLoader.GetTemplate(ntpl.WeChat, templateName)
+func (n *WeChatNotifier) sendTemplate(templateName string, data map[string]any, format ...string) error {
+	tmpl, err := n.tplLoader.GetTemplate(ntpl.WeChat, templateName)
 	if err != nil {
 		return fmt.Errorf("failed to get template: %w", err)
 	}
@@ -180,24 +185,24 @@ func (w *WeChatNotifier) sendTemplate(templateName string, data map[string]any, 
 		messageFormat = format[0]
 	}
 	if messageFormat == "markdown" {
-		return w.sendMarkdown(content.String())
+		return n.sendMarkdown(content.String())
 	}
 
 	return nil
 }
 
 // sendMarkdown sends a markdown message
-func (w *WeChatNotifier) sendMarkdown(content string) error {
-	w.tokenMu.RLock()
-	token := w.token
-	w.tokenMu.RUnlock()
+func (n *WeChatNotifier) sendMarkdown(content string) error {
+	n.tokenMu.RLock()
+	token := n.token
+	n.tokenMu.RUnlock()
 
 	msg := WeChatMessage{
-		ToUser:  w.config.ToUser,
-		ToParty: w.config.ToParty,
-		ToTag:   w.config.ToTag,
+		ToUser:  n.config.ToUser,
+		ToParty: n.config.ToParty,
+		ToTag:   n.config.ToTag,
 		MsgType: "markdown",
-		AgentID: w.config.AgentID,
+		AgentID: n.config.AgentID,
 	}
 	msg.Markdown.Content = content
 
@@ -207,13 +212,15 @@ func (w *WeChatNotifier) sendMarkdown(content string) error {
 	}
 
 	url := fmt.Sprintf("https://qyapi.weixin.qq.com/cgi-bin/message/send?access_token=%s", token)
-	resp, err := w.client.Post(url, "application/json", bytes.NewBuffer(payload))
+	resp, err := n.client.Post(url, "application/json", bytes.NewBuffer(payload))
 	if err != nil {
 		return fmt.Errorf("failed to send message: %w", err)
 	}
 
 	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
+		if err := Body.Close(); err != nil {
+			n.logger.Error("Failed to close response body", zap.Error(err))
+		}
 	}(resp.Body)
 
 	var result struct {
@@ -227,10 +234,10 @@ func (w *WeChatNotifier) sendMarkdown(content string) error {
 	if result.ErrCode != 0 {
 		if result.ErrCode == 40014 || result.ErrCode == 42001 {
 			// Token expired, refresh and retry
-			if err := w.refreshToken(); err != nil {
+			if err := n.refreshToken(); err != nil {
 				return fmt.Errorf("failed to refresh token: %w", err)
 			}
-			return w.sendMarkdown(content)
+			return n.sendMarkdown(content)
 		}
 		return fmt.Errorf("wechat api error: %s", result.ErrMsg)
 	}

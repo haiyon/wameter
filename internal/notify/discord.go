@@ -161,7 +161,9 @@ func (n *DiscordNotifier) send(msg DiscordMessage) error {
 	}
 
 	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
+		if err := Body.Close(); err != nil {
+			n.logger.Error("Failed to close response body", zap.Error(err))
+		}
 	}(resp.Body)
 
 	if resp.StatusCode == 429 {

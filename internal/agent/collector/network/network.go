@@ -410,7 +410,9 @@ func (c *networkCollector) queryExternalProvider(ctx context.Context, provider s
 	}
 
 	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
+		if err := Body.Close(); err != nil {
+			c.logger.Error("Failed to close response body", zap.Error(err))
+		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {

@@ -38,6 +38,9 @@ func (api *API) RegisterMetricsRoutes(r *gin.RouterGroup) {
 
 // saveMetrics handles saving metrics data
 func (api *API) saveMetrics(c *gin.Context) {
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
 	var data types.MetricsData
@@ -62,7 +65,7 @@ func (api *API) saveMetrics(c *gin.Context) {
 	// Set reported time
 	data.ReportedAt = time.Now()
 
-	if err := api.service.SaveMetrics(c.Request.Context(), &data); err != nil {
+	if err := api.service.SaveMetrics(ctx, &data); err != nil {
 		if errors.Is(err, context.Canceled) {
 			api.logger.Info("Client canceled metrics save request",
 				zap.String("agent_id", data.AgentID))
@@ -82,6 +85,10 @@ func (api *API) saveMetrics(c *gin.Context) {
 
 // getMetrics handles retrieving metrics data
 func (api *API) getMetrics(c *gin.Context) {
+
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
 	var query struct {
@@ -130,7 +137,7 @@ func (api *API) getMetrics(c *gin.Context) {
 		query.Limit = 10000
 	}
 
-	metrics, err := api.service.GetMetrics(c.Request.Context(), service.MetricsQuery{
+	metrics, err := api.service.GetMetrics(ctx, service.MetricsQuery{
 		AgentIDs:  query.AgentIDs,
 		StartTime: startTime,
 		EndTime:   endTime,
@@ -161,6 +168,9 @@ func (api *API) getMetrics(c *gin.Context) {
 
 // getLatestMetrics handles retrieving latest metrics for an agent
 func (api *API) getLatestMetrics(c *gin.Context) {
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
 	agentID := c.Query("agent_id")
@@ -169,7 +179,7 @@ func (api *API) getLatestMetrics(c *gin.Context) {
 		return
 	}
 
-	metrics, err := api.service.GetLatestMetrics(c.Request.Context(), agentID)
+	metrics, err := api.service.GetLatestMetrics(ctx, agentID)
 	if err != nil {
 		api.logger.Error("Failed to get latest metrics",
 			zap.Error(err),
@@ -188,6 +198,9 @@ func (api *API) getLatestMetrics(c *gin.Context) {
 }
 
 func (api *API) exportMetrics(c *gin.Context) {
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
 	// Parse export request
@@ -226,7 +239,7 @@ func (api *API) exportMetrics(c *gin.Context) {
 	}
 
 	// Export metrics
-	reader, err := api.service.ExportMetrics(c.Request.Context(), filter.Format, metricsFilter)
+	reader, err := api.service.ExportMetrics(ctx, filter.Format, metricsFilter)
 	if err != nil {
 		api.logger.Error("Failed to export metrics",
 			zap.Error(err),

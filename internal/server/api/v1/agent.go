@@ -39,9 +39,12 @@ func (api *API) RegisterAgentRoutes(r *gin.RouterGroup) {
 
 // getAgents handles retrieving all agents
 func (api *API) getAgents(c *gin.Context) {
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
-	agents, err := api.service.GetAgents(c.Request.Context())
+	agents, err := api.service.GetAgents(ctx)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			api.logger.Info("Client canceled agents request")
@@ -64,6 +67,9 @@ func (api *API) getAgents(c *gin.Context) {
 
 // getAgent handles retrieving a specific agent
 func (api *API) getAgent(c *gin.Context) {
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
 	agentID := c.Param("id")
@@ -72,7 +78,7 @@ func (api *API) getAgent(c *gin.Context) {
 		return
 	}
 
-	agent, err := api.service.GetAgent(c.Request.Context(), agentID)
+	agent, err := api.service.GetAgent(ctx, agentID)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			api.logger.Info("Client canceled agent request",
@@ -98,6 +104,9 @@ func (api *API) getAgent(c *gin.Context) {
 
 // registerAgent handles agent registration
 func (api *API) registerAgent(c *gin.Context) {
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
 	var agent types.AgentInfo
@@ -106,7 +115,7 @@ func (api *API) registerAgent(c *gin.Context) {
 		return
 	}
 
-	if err := api.service.RegisterAgent(c.Request.Context(), &agent); err != nil {
+	if err := api.service.RegisterAgent(ctx, &agent); err != nil {
 		api.logger.Error("Failed to register agent",
 			zap.Error(err),
 			zap.String("agent_id", agent.ID))
@@ -119,6 +128,9 @@ func (api *API) registerAgent(c *gin.Context) {
 
 // updateAgent handles agent update requests
 func (api *API) updateAgent(c *gin.Context) {
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
 	// Get agent ID from URL
@@ -143,7 +155,7 @@ func (api *API) updateAgent(c *gin.Context) {
 	}
 
 	// Get existing agent
-	agent, err := api.service.GetAgent(c.Request.Context(), agentID)
+	agent, err := api.service.GetAgent(ctx, agentID)
 	if err != nil {
 		if errors.Is(err, types.ErrAgentNotFound) {
 			resp.NotFound(errors.New("agent not found"))
@@ -168,7 +180,7 @@ func (api *API) updateAgent(c *gin.Context) {
 	}
 
 	// Update agent
-	if err := api.service.UpdateAgent(c.Request.Context(), agent); err != nil {
+	if err := api.service.UpdateAgent(ctx, agent); err != nil {
 		api.logger.Error("Failed to update agent",
 			zap.Error(err),
 			zap.String("agent_id", agentID))
@@ -181,10 +193,13 @@ func (api *API) updateAgent(c *gin.Context) {
 
 // handleAgentHeartbeat handles agent heartbeat
 func (api *API) handleAgentHeartbeat(c *gin.Context) {
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 	agentID := c.Param("id")
 
-	if err := api.service.UpdateAgentStatus(c.Request.Context(), agentID, types.AgentStatusOnline); err != nil {
+	if err := api.service.UpdateAgentStatus(ctx, agentID, types.AgentStatusOnline); err != nil {
 		if errors.Is(err, types.ErrAgentNotFound) {
 			resp.NotFound(errors.New("agent not found"))
 			return
@@ -204,6 +219,9 @@ func (api *API) handleAgentHeartbeat(c *gin.Context) {
 
 // getAgentMetrics handles agent metrics requests
 func (api *API) getAgentMetrics(c *gin.Context) {
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
 	// Get agent ID from URL
@@ -214,7 +232,7 @@ func (api *API) getAgentMetrics(c *gin.Context) {
 	}
 
 	// Get metrics
-	metrics, err := api.service.GetAgentMetrics(c.Request.Context(), agentID)
+	metrics, err := api.service.GetAgentMetrics(ctx, agentID)
 	if err != nil {
 		if errors.Is(err, types.ErrAgentNotFound) {
 			resp.NotFound(errors.New("agent not found"))
@@ -232,6 +250,10 @@ func (api *API) getAgentMetrics(c *gin.Context) {
 
 // sendCommand handles agent command requests
 func (api *API) sendCommand(c *gin.Context) {
+
+	ctx, cancel := context.WithCancel(c.Request.Context())
+	defer cancel()
+
 	resp := response.New(c, api.logger)
 
 	// Get agent ID from URL
@@ -277,7 +299,7 @@ func (api *API) sendCommand(c *gin.Context) {
 	}
 
 	// Send command
-	if err := api.service.SendCommand(c.Request.Context(), agentID, command); err != nil {
+	if err := api.service.SendCommand(ctx, agentID, command); err != nil {
 		if errors.Is(err, types.ErrAgentNotFound) {
 			resp.NotFound(errors.New("agent not found"))
 			return

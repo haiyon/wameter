@@ -199,7 +199,9 @@ func (h *Handler) registerAgent(ctx context.Context) error {
 	}
 
 	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
+		if err := Body.Close(); err != nil {
+			h.logger.Error("Failed to close response body", zap.Error(err))
+		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
@@ -263,7 +265,9 @@ func (h *Handler) sendHeartbeat(ctx context.Context) error {
 	}
 
 	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
+		if err := Body.Close(); err != nil {
+			h.logger.Error("Failed to close response body", zap.Error(err))
+		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {

@@ -360,7 +360,9 @@ func (s *Service) sendHTTPCommand(ctx context.Context, agentID string, payload a
 	}
 
 	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
+		if err := Body.Close(); err != nil {
+			s.logger.Error("Failed to close response body", zap.Error(err))
+		}
 	}(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {

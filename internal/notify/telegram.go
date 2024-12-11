@@ -236,7 +236,9 @@ func (n *TelegramNotifier) sendMessage(chatID, text, format string) error {
 	}
 
 	defer func(Body io.ReadCloser) {
-		_ = Body.Close()
+		if err := Body.Close(); err != nil {
+			n.logger.Error("Failed to close response body", zap.Error(err))
+		}
 	}(resp.Body)
 
 	if resp.StatusCode == http.StatusTooManyRequests {

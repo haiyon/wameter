@@ -186,7 +186,10 @@ func (d *Database) WithTransaction(ctx context.Context, fn func(*sql.Tx) error) 
 
 	defer func() {
 		if p := recover(); p != nil {
-			_ = tx.Rollback()
+			if rbErr := tx.Rollback(); rbErr != nil {
+				d.logger.Error("Transaction rollback failed during panic",
+					zap.Error(rbErr))
+			}
 			panic(p)
 		}
 	}()
