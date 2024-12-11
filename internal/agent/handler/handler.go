@@ -11,6 +11,7 @@ import (
 	"os"
 	"sync"
 	"time"
+	"wameter/internal/retry"
 	"wameter/internal/types"
 	"wameter/internal/version"
 
@@ -20,16 +21,22 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	StateRegistering = "registering"
+	StateRunning     = "running"
+)
+
 // Handler handles agent commands and HTTP endpoints
 type Handler struct {
 	config     *config.Config
 	logger     *zap.Logger
 	server     *http.Server
 	commands   chan Command
-	stopChan   chan struct{}
 	wg         sync.WaitGroup
 	collectors map[string]collector.Collector
 	manager    *collector.Manager
+	state      string
+	stateMu    sync.RWMutex
 }
 
 // NewHandler creates new Handler instance
@@ -38,7 +45,6 @@ func NewHandler(cfg *config.Config, logger *zap.Logger, cm *collector.Manager) *
 		config:     cfg,
 		logger:     logger,
 		commands:   make(chan Command, 100),
-		stopChan:   make(chan struct{}),
 		collectors: make(map[string]collector.Collector),
 		manager:    cm,
 	}
@@ -68,9 +74,8 @@ func (h *Handler) RegisterCollector(name string, c collector.Collector) error {
 // Start begins handling commands and HTTP requests
 func (h *Handler) Start(ctx context.Context) error {
 	if !h.config.Agent.Standalone {
-		// Register agent
-		if err := h.registerAgent(ctx); err != nil {
-			h.logger.Error("Failed to register agent", zap.Error(err))
+		// Register agent with retry
+		if err := h.registerAgentWithRetry(ctx); err != nil {
 			return err
 		}
 	}
@@ -88,6 +93,7 @@ func (h *Handler) Start(ctx context.Context) error {
 		}
 	}()
 
+	// Start heartbeat
 	if !h.config.Agent.Standalone {
 		h.wg.Add(1)
 		go h.heartbeat(ctx)
@@ -98,18 +104,69 @@ func (h *Handler) Start(ctx context.Context) error {
 
 // Stop stops the handler
 func (h *Handler) Stop() error {
-	close(h.stopChan)
-
 	// Shutdown HTTP server
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	if err := h.server.Shutdown(ctx); err != nil {
-		return fmt.Errorf("failed to shutdown server: %w", err)
+		h.logger.Error("Server shutdown error", zap.Error(err))
 	}
 
-	h.wg.Wait()
-	return nil
+	done := make(chan struct{})
+	go func() {
+		h.wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		h.logger.Warn("Handler stop timed out, some goroutines may still be running")
+		return fmt.Errorf("handler stop timed out")
+	}
+}
+
+// setState sets the handler state
+func (h *Handler) setState(state string) {
+	h.stateMu.Lock()
+	defer h.stateMu.Unlock()
+	// if h.state != state {
+	// 	h.logger.Debug("State changed",
+	// 		zap.String("from", string(h.state)),
+	// 		zap.String("to", string(state)))
+	// }
+	h.state = state
+}
+
+// getState returns the handler state
+func (h *Handler) getState() string {
+	h.stateMu.RLock()
+	defer h.stateMu.RUnlock()
+	return h.state
+}
+
+// registerAgentWithRetry registers the agent with the server, retrying on failure
+func (h *Handler) registerAgentWithRetry(ctx context.Context) error {
+	h.setState(StateRegistering)
+
+	if h.config.Retry == nil || !h.config.Retry.Enable {
+		err := h.registerAgent(ctx)
+		if err == nil {
+			h.setState(StateRunning)
+		}
+		return err
+	}
+
+	h.logger.Debug("Registering agent with retry", zap.Any("retry", h.config.Retry))
+	err := retry.Execute(ctx, h.config.Retry, h.registerAgent)
+	if err != nil {
+		h.logger.Error("Failed to register agent", zap.Error(err))
+	} else {
+		h.setState(StateRunning)
+	}
+
+	return err
 }
 
 // registerAgent registers the agent with the server
@@ -160,6 +217,11 @@ func (h *Handler) registerAgent(ctx context.Context) error {
 
 // heartbeat handles agent heartbeat
 func (h *Handler) heartbeat(ctx context.Context) {
+	// Do not heartbeat if agent is not registered
+	if h.getState() == StateRegistering {
+		return
+	}
+
 	defer h.wg.Done()
 
 	interval := h.config.Agent.Heartbeat.Interval
@@ -170,35 +232,18 @@ func (h *Handler) heartbeat(ctx context.Context) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	failureCount := 0
-	maxFailures := h.config.Agent.Heartbeat.MaxFailures
-	if maxFailures == 0 {
-		maxFailures = 3
-	}
-
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-h.stopChan:
-			return
 		case <-ticker.C:
-			if err := h.sendHeartbeat(ctx); err != nil {
-				failureCount++
-				h.logger.Error("Failed to send heartbeat",
-					zap.Error(err),
-					zap.Int("failure_count", failureCount))
-
-				if failureCount >= maxFailures {
-					h.logger.Error("Max heartbeat failures reached, attempting to re-register")
-					if err := h.registerAgent(ctx); err != nil {
-						h.logger.Error("Failed to re-register agent", zap.Error(err))
-					} else {
-						failureCount = 0
-					}
+			if err := retry.Execute(ctx, h.config.Retry, h.sendHeartbeat); err != nil {
+				h.logger.Warn("Heartbeat failed after retries, attempting to re-register",
+					zap.Error(err))
+				if err := h.registerAgentWithRetry(ctx); err != nil {
+					h.logger.Error("Failed to re-register after heartbeat failure",
+						zap.Error(err))
 				}
-			} else {
-				failureCount = 0
 			}
 		}
 	}
@@ -307,8 +352,6 @@ func (h *Handler) processCommands(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		case <-h.stopChan:
 			return
 		case cmd := <-h.commands:
 			if err := h.executeCommand(ctx, cmd); err != nil {

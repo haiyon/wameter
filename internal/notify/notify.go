@@ -293,8 +293,8 @@ func (m *Manager) NotifyIPChange(agent *types.AgentInfo, change *types.IPChange)
 
 // Stop gracefully stops the notification manager
 func (m *Manager) Stop() error {
-	m.cancel() // Signal processNotifications to stop
-
+	// Signal processNotifications to stop
+	m.cancel()
 	// Wait for all notifications to be processed
 	done := make(chan struct{})
 	go func() {

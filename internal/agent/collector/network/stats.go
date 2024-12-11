@@ -21,7 +21,6 @@ type statsCollector struct {
 	stats     map[string]*types.InterfaceStats
 	prevStats map[string]*types.InterfaceStats
 	mu        sync.RWMutex
-	stopChan  chan struct{}
 }
 
 // newStatsCollector creates a new stats collector
@@ -31,7 +30,6 @@ func newStatsCollector(cfg *config.NetworkConfig, logger *zap.Logger) *statsColl
 		logger:    logger,
 		stats:     make(map[string]*types.InterfaceStats),
 		prevStats: make(map[string]*types.InterfaceStats),
-		stopChan:  make(chan struct{}),
 	}
 }
 
@@ -55,8 +53,6 @@ func (s *statsCollector) Start(ctx context.Context) error {
 				}
 			case <-ctx.Done():
 				return
-			case <-s.stopChan:
-				return
 			}
 		}
 	}()
@@ -66,7 +62,6 @@ func (s *statsCollector) Start(ctx context.Context) error {
 
 // Stop stops the stats collector
 func (s *statsCollector) Stop() error {
-	close(s.stopChan)
 	return nil
 }
 

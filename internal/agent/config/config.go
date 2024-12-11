@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 	"wameter/internal/config"
+	"wameter/internal/retry"
 
 	"github.com/spf13/viper"
 )
@@ -16,6 +17,7 @@ type Config struct {
 	Collector CollectorConfig      `mapstructure:"collector"`
 	Notify    *config.NotifyConfig `mapstructure:"notify"`
 	Log       *config.LogConfig    `mapstructure:"log"`
+	Retry     *retry.Config        `mapstructure:"retry"`
 }
 
 // AgentConfig represents agent configuration
@@ -195,6 +197,31 @@ func setDefaults(cfg *Config) {
 
 	if cfg.Log.MaxAge == 0 {
 		cfg.Log.MaxAge = 28
+	}
+
+	if cfg.Retry != nil && cfg.Retry.Enable {
+		if cfg.Retry.InitialAttempts <= 0 {
+			cfg.Retry.InitialAttempts = 3
+		}
+		if cfg.Retry.InitialInterval <= 0 {
+			cfg.Retry.InitialInterval = time.Second
+		}
+		if cfg.Retry.MinuteAttempts <= 0 {
+			cfg.Retry.MinuteAttempts = 180
+		}
+		if cfg.Retry.MinuteInterval <= 0 {
+			cfg.Retry.MinuteInterval = time.Minute
+		}
+		if cfg.Retry.HourlyAttempts <= 0 {
+			cfg.Retry.HourlyAttempts = 24
+		}
+		if cfg.Retry.HourlyInterval <= 0 {
+		}
+		if cfg.Retry.FinalRetryTimeout <= 0 {
+			cfg.Retry.FinalRetryTimeout = 48 * time.Hour
+		}
+	} else if cfg.Retry == nil {
+		cfg.Retry = retry.DefaultRetryConfig()
 	}
 }
 

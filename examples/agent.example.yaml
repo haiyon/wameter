@@ -162,3 +162,10 @@ log:
   max_age: 30      # Maximum days to retain
   compress: true   # Compress rotated logs
   color: true      # Enable colored output for console format
+
+# Retry configuration
+retry:
+  initial_attempts: 3 #
+  minute_attempts: 180 # 3 attempts per minute * 60 minutes
+  hourly_attempts: 24 # 3 attempts per hour * 8 hours
+  final_retry_timeout: 10s

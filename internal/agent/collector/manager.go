@@ -15,18 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// Collector defines the interface for all collectors
-type Collector interface {
-	// Name returns the collector name
-	Name() string
-	// Start starts the collector
-	Start(ctx context.Context) error
-	// Collect performs a single collection
-	Collect(ctx context.Context) (*types.MetricsData, error)
-	// Stop stops the collector
-	Stop() error
-}
-
 // Manager manages multiple collectors
 type Manager struct {
 	reporter   *reporter.Reporter
@@ -72,15 +60,15 @@ func (m *Manager) Start(ctx context.Context) error {
 	}
 
 	// Start all collectors
-	m.mu.RLock()
 	for name, collector := range m.collectors {
-		if err := collector.Start(ctx); err != nil {
-			m.mu.RUnlock()
+		m.mu.RLock()
+		err := collector.Start(ctx)
+		m.mu.RUnlock()
+		if err != nil {
 			return fmt.Errorf("failed to start collector %s: %w", name, err)
 		}
-		m.logger.Info("Started collector", zap.String("name", name))
+		m.logger.Info("Collector started", zap.String("name", name))
 	}
-	m.mu.RUnlock()
 
 	// Start collection loop
 	go m.startCollectorLoop(ctx)
@@ -120,6 +108,7 @@ func (m *Manager) Collect(ctx context.Context) (*types.MetricsData, error) {
 	var mu sync.Mutex
 	errs := make(map[string]error)
 
+	// Launch collectors
 	for name, collector := range m.collectors {
 		wg.Add(1)
 		go func(name string, c Collector) {
@@ -195,7 +184,6 @@ func (m *Manager) startCollectorLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			m.logger.Info("Stopping collection loop")
 			return
 		case <-ticker.C:
 			data, err := m.Collect(ctx)

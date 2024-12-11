@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 	"wameter/internal/agent/collector"
 	"wameter/internal/agent/config"
 	"wameter/internal/agent/handler"
@@ -44,61 +45,18 @@ func main() {
 		_, _ = fmt.Fprintf(os.Stderr, "%v\n", err)
 		os.Exit(1)
 	}
-	defer func() {
+
+	defer func(logger *zap.Logger) {
 		_ = logger.Sync()
-	}()
+	}(logger)
 
 	// Create context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Initialize reporter
-	var r *reporter.Reporter
-	if !cfg.Agent.Standalone {
-		r = reporter.NewReporter(cfg, logger)
-		if err := r.Start(ctx); err != nil {
-			logger.Fatal("Failed to start reporter", zap.Error(err))
-		}
-		defer func(r *reporter.Reporter) {
-			_ = r.Stop()
-		}(r)
-	}
-
-	// Initialize notifier
-	var n *notify.Manager
-	if cfg.Agent.Standalone && cfg.Notify.Enabled {
-		n, err = notify.NewManager(cfg.Notify, logger)
-		if err != nil {
-			logger.Error("Failed to initialize notifier", zap.Error(err))
-		} else {
-			defer func(n *notify.Manager) {
-				_ = n.Stop()
-			}(n)
-		}
-	}
-
-	// Initialize collector manager
-	cm := collector.NewManager(cfg, r, n, logger)
-
-	// Initialize handler
-	h := handler.NewHandler(cfg, logger, cm)
-
-	// Start components
-	components := []struct {
-		name  string
-		start func(context.Context) error
-		stop  func() error
-	}{
-		{"collector", cm.Start, cm.Stop},
-		{"handler", h.Start, h.Stop},
-	}
-
-	for _, c := range components {
-		if err := c.start(ctx); err != nil {
-			logger.Fatal("Failed to start component",
-				zap.String("component", c.name),
-				zap.Error(err))
-		}
+	// Run agent
+	if err := run(ctx, cfg, logger); err != nil {
+		logger.Fatal("Failed to run agent", zap.Error(err))
 	}
 
 	// Handle signals
@@ -109,17 +67,63 @@ func main() {
 	<-sigChan
 
 	// Graceful shutdown
-	cancel()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
 
-	// Stop components in reverse order
-	for i := len(components) - 1; i >= 0; i-- {
-		c := components[i]
-		if err := c.stop(); err != nil {
-			logger.Error("Failed to stop component",
-				zap.String("component", c.name),
-				zap.Error(err))
+	cancel()
+	<-shutdownCtx.Done()
+
+	logger.Info("Shutdown complete")
+}
+
+// run runs the agent
+func run(ctx context.Context, cfg *config.Config, logger *zap.Logger) (err error) {
+	// Initialize reporter
+	var r *reporter.Reporter
+	if !cfg.Agent.Standalone {
+		r = reporter.NewReporter(cfg, logger)
+	}
+
+	// Initialize notifier
+	var n *notify.Manager
+	if cfg.Agent.Standalone && cfg.Notify.Enabled {
+		if n, err = notify.NewManager(cfg.Notify, logger); err != nil {
+			return fmt.Errorf("failed to initialize notifier: %w", err)
 		}
 	}
 
-	logger.Info("Shutdown complete")
+	// Initialize collector and handler
+	cm := collector.NewManager(cfg, r, n, logger)
+	h := handler.NewHandler(cfg, logger, cm)
+
+	// Start components
+	if err = h.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start handler: %w", err)
+	}
+
+	if err = cm.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start collector: %w", err)
+	}
+
+	if r != nil {
+		if err = r.Start(ctx); err != nil {
+			return fmt.Errorf("failed to start reporter: %w", err)
+		}
+	}
+
+	// Handle cleanup in a separate goroutine
+	go func() {
+		<-ctx.Done()
+		// Stop components in reverse order
+		if r != nil {
+			_ = r.Stop()
+		}
+		_ = cm.Stop()
+		_ = h.Stop()
+		if n != nil {
+			_ = n.Stop()
+		}
+	}()
+
+	return nil
 }

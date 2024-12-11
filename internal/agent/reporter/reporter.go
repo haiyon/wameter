@@ -20,12 +20,11 @@ import (
 
 // Reporter implements Reporter interface
 type Reporter struct {
-	config   *config.Config
-	logger   *zap.Logger
-	client   *http.Client
-	buffer   chan *types.MetricsData
-	stopChan chan struct{}
-	wg       sync.WaitGroup
+	config *config.Config
+	logger *zap.Logger
+	client *http.Client
+	buffer chan *types.MetricsData
+	wg     sync.WaitGroup
 }
 
 // NewReporter creates new reporter
@@ -53,11 +52,10 @@ func NewReporter(cfg *config.Config, logger *zap.Logger) *Reporter {
 	}
 
 	return &Reporter{
-		config:   cfg,
-		logger:   logger,
-		client:   client,
-		buffer:   make(chan *types.MetricsData, 1000),
-		stopChan: make(chan struct{}),
+		config: cfg,
+		logger: logger,
+		client: client,
+		buffer: make(chan *types.MetricsData, 1000),
 	}
 }
 
@@ -70,9 +68,27 @@ func (r *Reporter) Start(ctx context.Context) error {
 
 // Stop stops the reporter
 func (r *Reporter) Stop() error {
-	close(r.stopChan)
-	r.wg.Wait()
-	return nil
+	// Wait for all data to be processed
+	remaining := len(r.buffer)
+	if remaining > 0 {
+		r.logger.Info("Processing remaining data before stop",
+			zap.Int("pending_items", remaining))
+	}
+	// Check if all data is processed
+	done := make(chan struct{})
+	go func() {
+		r.wg.Wait()
+		close(done)
+	}()
+	// Wait for 5 seconds
+	select {
+	case <-done:
+		return nil
+	case <-time.After(5 * time.Second):
+		r.logger.Warn("Reporter stop timed out, some data may be lost",
+			zap.Int("lost_items", len(r.buffer)))
+		return fmt.Errorf("reporter stop timed out")
+	}
 }
 
 // Report sends metrics data
@@ -85,14 +101,13 @@ func (r *Reporter) Report(data *types.MetricsData) error {
 	}
 }
 
+// processLoop processes metrics data
 func (r *Reporter) processLoop(ctx context.Context) {
 	defer r.wg.Done()
 
 	for {
 		select {
 		case <-ctx.Done():
-			return
-		case <-r.stopChan:
 			return
 		case data := <-r.buffer:
 			if err := r.sendData(ctx, data); err != nil {

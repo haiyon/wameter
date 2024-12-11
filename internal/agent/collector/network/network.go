@@ -25,6 +25,7 @@ import (
 
 // networkCollector represents a network collector
 type networkCollector struct {
+	standalone bool
 	config     *config.NetworkConfig
 	agentID    string
 	logger     *zap.Logger
@@ -35,9 +36,7 @@ type networkCollector struct {
 	lastState  *types.NetworkState
 	mu         sync.RWMutex
 	client     *http.Client
-	standalone bool
 	wg         sync.WaitGroup
-	shutdown   chan struct{}
 }
 
 // NewCollector creates a new network collector
@@ -61,7 +60,6 @@ func NewCollector(cfg *config.NetworkConfig, agentID string, reporter *reporter.
 		config:     cfg,
 		agentID:    agentID,
 		logger:     logger,
-		shutdown:   make(chan struct{}),
 		ipTracker:  NewIPTracker(cfg.IPTracker, logger),
 		reporter:   reporter,
 		notifier:   notifier,
@@ -93,8 +91,6 @@ func (c *networkCollector) Start(ctx context.Context) error {
 
 // Stop stops the collector
 func (c *networkCollector) Stop() error {
-	close(c.shutdown)
-
 	// Wait for all goroutines to finish
 	doneChan := make(chan struct{})
 	go func() {
@@ -104,8 +100,7 @@ func (c *networkCollector) Stop() error {
 
 	select {
 	case <-doneChan:
-		c.logger.Info("Network collector stopped successfully")
-	case <-time.After(30 * time.Second):
+	case <-time.After(5 * time.Second):
 		c.logger.Warn("Network collector stop timed out")
 	}
 

@@ -4,15 +4,15 @@ import "fmt"
 
 // Config represents logging configuration
 type Config struct {
-	Directory    string `yaml:"directory"`
-	File         string `yaml:"file"`
-	MaxSize      int    `yaml:"max_size"` // MB
-	MaxBackups   int    `yaml:"max_backups"`
-	MaxAge       int    `yaml:"max_age"` // days
-	Compress     bool   `yaml:"compress"`
-	Level        string `yaml:"level"` // debug, info, warn, error
-	TimeFormat   string `yaml:"time_format"`
-	UseLocalTime bool   `yaml:"use_local_time"`
+	Directory    string `mapstructure:"directory"`
+	File         string `mapstructure:"file"`
+	MaxSize      int    `mapstructure:"max_size"` // MB
+	MaxBackups   int    `mapstructure:"max_backups"`
+	MaxAge       int    `mapstructure:"max_age"` // days
+	Compress     bool   `mapstructure:"compress"`
+	Level        string `mapstructure:"level"` // debug, info, warn, error
+	TimeFormat   string `mapstructure:"time_format"`
+	UseLocalTime bool   `mapstructure:"use_local_time"`
 }
 
 // Validate validates logging configuration
