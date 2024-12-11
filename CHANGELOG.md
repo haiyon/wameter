@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.2.2
+
+### Refactor
+
+- Separated service and API logic
+- Refactored database with repository layer
+
+### Features
+
+- Added Feishu notification support
+- Added health check method
+
+### Enhancements
+
+- Added retry policy for agent
+- Used short hash for agent hostname
+- Adjusted API metrics URL
+
 ## v0.2.1
 
 ### Refactor
