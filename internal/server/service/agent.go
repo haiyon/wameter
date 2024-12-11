@@ -184,7 +184,7 @@ func (s *Service) UpdateAgentStatus(ctx context.Context, agentID string, status 
 	s.agents[agentID] = agent
 
 	// Send notification if agent went offline
-	if status == types.AgentStatusOffline {
+	if status == types.AgentStatusOffline && s.notifier != nil && s.config.Notify.Enabled {
 		s.notifier.NotifyAgentOffline(agent)
 	}
 

@@ -406,7 +406,7 @@ func (s *Service) processNetworkMetrics(ctx context.Context, data *types.Metrics
 			}
 
 			// Send notification
-			if s.notifier != nil {
+			if s.notifier != nil && s.config.Notify.Enabled {
 				agent := &types.AgentInfo{
 					ID:       data.AgentID,
 					Hostname: data.Hostname,

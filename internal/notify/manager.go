@@ -12,38 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// NotifierType represents the type of notifier
-type NotifierType string
-
-const (
-	NotifierEmail    NotifierType = "email"
-	NotifierTelegram NotifierType = "telegram"
-	NotifierSlack    NotifierType = "slack"
-	NotifierWeChat   NotifierType = "wechat"
-	NotifierDingTalk NotifierType = "dingtalk"
-	NotifierDiscord  NotifierType = "discord"
-	NotifierWebhook  NotifierType = "webhook"
-	NotifierFeishu   NotifierType = "feishu"
-)
-
-// Notifier represents notifier interface
-type Notifier interface {
-	// NotifyAgentOffline sends agent offline notification
-	NotifyAgentOffline(agent *types.AgentInfo) error
-
-	// NotifyNetworkErrors sends network errors notification
-	NotifyNetworkErrors(agentID string, iface *types.InterfaceInfo) error
-
-	// NotifyHighNetworkUtilization sends high network utilization notification
-	NotifyHighNetworkUtilization(agentID string, iface *types.InterfaceInfo) error
-
-	// NotifyIPChange sends IP change notification
-	NotifyIPChange(agent *types.AgentInfo, change *types.IPChange) error
-
-	// Health checks the health of the notifier
-	Health(ctx context.Context) error
-}
-
 // notification represents a notification to be sent
 type notification struct {
 	notifierType NotifierType
@@ -62,41 +30,6 @@ type Manager struct {
 	wg          sync.WaitGroup
 	ctx         context.Context
 	cancel      context.CancelFunc
-}
-
-// RateLimiter implements rate limiting for notifications
-type RateLimiter struct {
-	mu        sync.Mutex
-	events    map[NotifierType][]time.Time
-	interval  time.Duration
-	maxEvents int
-}
-
-// AllowNotification checks if a notification is allowed under rate limits
-func (r *RateLimiter) AllowNotification(notifierType NotifierType) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	now := time.Now()
-	timestamps := r.events[notifierType]
-
-	// Clean expired timestamps
-	valid := make([]time.Time, 0)
-	for _, ts := range timestamps {
-		if now.Sub(ts) < r.interval {
-			valid = append(valid, ts)
-		}
-	}
-	r.events[notifierType] = valid
-
-	// Check if limit exceeded
-	if len(valid) >= r.maxEvents {
-		return false
-	}
-
-	// Add new timestamp
-	r.events[notifierType] = append(r.events[notifierType], now)
-	return true
 }
 
 // NewManager creates new notifier manager
