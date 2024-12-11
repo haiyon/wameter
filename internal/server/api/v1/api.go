@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"wameter/internal/server/api/response"
+	"wameter/internal/server/config"
 	"wameter/internal/server/service"
 
 	"github.com/gin-gonic/gin"
@@ -12,13 +13,15 @@ import (
 
 // API represents the API
 type API struct {
+	config  *config.Config
 	service *service.Service
 	logger  *zap.Logger
 }
 
 // NewAPI creates new API
-func NewAPI(svc *service.Service, logger *zap.Logger) *API {
+func NewAPI(cfg *config.Config, svc *service.Service, logger *zap.Logger) *API {
 	return &API{
+		config:  cfg,
 		service: svc,
 		logger:  logger,
 	}

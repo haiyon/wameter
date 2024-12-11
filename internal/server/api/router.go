@@ -70,7 +70,7 @@ func (r *Router) setupMiddleware() {
 
 // setupAPIV1 configures v1 API routes
 func (r *Router) setupAPIV1(svc *service.Service) {
-	api := av1.NewAPI(svc, r.logger)
+	api := av1.NewAPI(r.config, svc, r.logger)
 
 	// Create v1 route group
 	v1Router := r.engine.Group("/v1")

@@ -27,7 +27,7 @@ var _ MetricsAPI = (*API)(nil)
 // RegisterMetricsRoutes registers metrics routes
 func (api *API) RegisterMetricsRoutes(r *gin.RouterGroup) {
 	// Metrics endpoints
-	metrics := r.Group("/metrics")
+	metrics := r.Group(api.config.Server.MetricsPath)
 	{
 		metrics.POST("", api.saveMetrics)
 		metrics.GET("", api.getMetrics)
@@ -181,12 +181,6 @@ func (api *API) getLatestMetrics(c *gin.Context) {
 
 	metrics, err := api.service.GetLatestMetrics(c.Request.Context(), agentID)
 	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			api.logger.Info("Client canceled latest metrics request",
-				zap.String("agent_id", agentID))
-			return
-		}
-
 		api.logger.Error("Failed to get latest metrics",
 			zap.Error(err),
 			zap.String("agent_id", agentID))
