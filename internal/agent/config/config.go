@@ -189,43 +189,11 @@ func setDefaults(cfg *Config) {
 		}
 	}
 
-	if cfg.Log.MaxSize == 0 {
-		cfg.Log.MaxSize = 100
-	}
+	// Set defaults for logger
+	cfg.Log = cfg.Log.SetDefaults()
 
-	if cfg.Log.MaxBackups == 0 {
-		cfg.Log.MaxBackups = 3
-	}
-
-	if cfg.Log.MaxAge == 0 {
-		cfg.Log.MaxAge = 28
-	}
-
-	if cfg.Retry != nil && cfg.Retry.Enable {
-		if cfg.Retry.InitialAttempts <= 0 {
-			cfg.Retry.InitialAttempts = 3
-		}
-		if cfg.Retry.InitialInterval <= 0 {
-			cfg.Retry.InitialInterval = time.Second
-		}
-		if cfg.Retry.MinuteAttempts <= 0 {
-			cfg.Retry.MinuteAttempts = 180
-		}
-		if cfg.Retry.MinuteInterval <= 0 {
-			cfg.Retry.MinuteInterval = time.Minute
-		}
-		if cfg.Retry.HourlyAttempts <= 0 {
-			cfg.Retry.HourlyAttempts = 24
-		}
-		if cfg.Retry.HourlyInterval <= 0 {
-			cfg.Retry.HourlyInterval = time.Hour
-		}
-		if cfg.Retry.FinalRetryTimeout <= 0 {
-			cfg.Retry.FinalRetryTimeout = 48 * time.Hour
-		}
-	} else if cfg.Retry == nil {
-		cfg.Retry = retry.DefaultRetryConfig()
-	}
+	// Set defaults for retry
+	cfg.Retry = cfg.Retry.SetDefaults()
 }
 
 // Validate validates the configuration

@@ -155,16 +155,16 @@ notify:
 # Logging configuration
 log:
   level: "info"  # debug, info, warn, error
-  format: "json" # json, console
   file: "/var/log/wameter/agent.log"
   max_size: 100    # Maximum size in MB
   max_backups: 7   # Maximum number of old log files
   max_age: 30      # Maximum days to retain
   compress: true   # Compress rotated logs
-  color: true      # Enable colored output for console format
 
 # Retry configuration
 retry:
+  enabled: true
+  stage: 1 # 1 for initial fast retries, 2 for minute-interval retries, 4 for hourly-interval retries, 8 for final retry, or 15 for all
   initial_attempts: 3 #
   minute_attempts: 180 # 3 attempts per minute * 60 minutes
   hourly_attempts: 24 # 3 attempts per hour * 8 hours

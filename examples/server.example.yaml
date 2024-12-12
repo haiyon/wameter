@@ -168,10 +168,8 @@ notify:
 # Logging configuration
 log:
   level: "info"  # debug, info, warn, error
-  format: "json" # json, console
   file: "/var/log/wameter/server.log"
   max_size: 100    # MB
   max_backups: 7   # files
   max_age: 30      # days
   compress: true
-  color: true

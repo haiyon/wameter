@@ -149,7 +149,7 @@ func (h *Handler) getState() string {
 func (h *Handler) registerAgentWithRetry(ctx context.Context) error {
 	h.setState(StateRegistering)
 
-	if h.config.Retry == nil || !h.config.Retry.Enable {
+	if h.config.Retry == nil || !h.config.Retry.Enabled {
 		err := h.registerAgent(ctx)
 		if err == nil {
 			h.setState(StateRunning)
@@ -157,12 +157,10 @@ func (h *Handler) registerAgentWithRetry(ctx context.Context) error {
 		return err
 	}
 
-	h.logger.Debug("Registering agent with retry", zap.Any("retry", h.config.Retry))
 	err := retry.Execute(ctx, h.config.Retry, h.registerAgent)
-	if err != nil {
-		h.logger.Error("Failed to register agent", zap.Error(err))
-	} else {
+	if err == nil {
 		h.setState(StateRunning)
+		return nil
 	}
 
 	return err
