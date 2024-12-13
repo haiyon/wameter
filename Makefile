@@ -45,8 +45,13 @@ TEST_TIMEOUT ?= 10m
 .PHONY: all
 all: clean verify test build
 
+.PHONY: generate
+generate:
+	@echo "Generating code..."
+	@go generate ./...
+
 .PHONY: build
-build: build-server build-agent
+build: generate build-server build-agent
 
 .PHONY: build-server
 build-server:
@@ -95,12 +100,12 @@ build-all:
 	done
 
 .PHONY: test
-test:
+test: generate
 	@echo "Running tests..."
 	@go test $(TEST_FLAGS) -timeout $(TEST_TIMEOUT) ./...
 
 .PHONY: test-short
-test-short:
+test-short: generate
 	@echo "Running short tests..."
 	@go test -short $(TEST_FLAGS) -timeout $(TEST_TIMEOUT) ./...
 
@@ -110,7 +115,7 @@ test-coverage: test
 	@go tool cover -html=coverage.txt -o coverage.html
 
 .PHONY: bench
-bench:
+bench: generate
 	@echo "Running benchmarks..."
 	@go test -bench=. -benchmem ./...
 
@@ -171,6 +176,7 @@ docker-push:
 help:
 	@echo "Available targets:"
 	@echo "  all          - Clean, verify, test, and build"
+	@echo "  generate     - Generate code using go generate"
 	@echo "  build        - Build both server and agent binaries"
 	@echo "  build-server - Build server binary only"
 	@echo "  build-agent  - Build agent binary only"

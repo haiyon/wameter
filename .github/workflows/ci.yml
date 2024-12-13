@@ -28,6 +28,9 @@ jobs:
           check-latest: true
           cache: true
 
+      - name: Generate code
+        run: make generate
+
       - name: Verify dependencies
         run: |
           make verify
@@ -78,6 +81,9 @@ jobs:
         with:
           platforms: arm64
 
+      - name: Generate code
+        run: make generate
+
       - name: Build
         env:
           GOOS: ${{ matrix.os }}
@@ -96,6 +102,15 @@ jobs:
     needs: verify
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        image:
+          - name: server
+            file: docker/server/Dockerfile
+            platforms: linux/amd64,linux/arm64
+          - name: agent
+            file: docker/agent/Dockerfile
+            platforms: linux/amd64,linux/arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -103,20 +118,16 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build server image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: docker/server/Dockerfile
-          platforms: linux/amd64
-          push: false
-          load: true
+      - name: Generate code
+        run: make generate
 
-      - name: Build agent image
+      - name: Build image
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: docker/agent/Dockerfile
-          platforms: linux/amd64
+          file: ${{ matrix.image.file }}
+          platforms: ${{ matrix.image.platforms }}
           push: false
           load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

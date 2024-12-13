@@ -48,6 +48,9 @@ jobs:
           check-latest: true
           cache: true
 
+      - name: Generate code
+        run: make generate
+
       - name: Verify dependencies
         run: make verify
 
@@ -95,6 +98,9 @@ jobs:
         with:
           platforms: arm64
 
+      - name: Generate code
+        run: make generate
+
       - name: Build for platform
         env:
           GOOS: ${{ matrix.os }}
@@ -120,9 +126,12 @@ jobs:
           - name: server
             file: docker/server/Dockerfile
             suffix: ""
+            platforms: linux/amd64,linux/arm64
           - name: agent
             file: docker/agent/Dockerfile
             suffix: -agent
+            platforms: linux/amd64,linux/arm64
+
     steps:
       - uses: actions/checkout@v4
 
@@ -131,8 +140,9 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        with:
-          platforms: linux/amd64,linux/arm64
+
+      - name: Generate code
+        run: make generate
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -162,7 +172,7 @@ jobs:
         with:
           context: .
           file: ${{ matrix.image.file }}
-          platforms: linux/amd64,linux/arm64
+          platforms: ${{ matrix.image.platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
