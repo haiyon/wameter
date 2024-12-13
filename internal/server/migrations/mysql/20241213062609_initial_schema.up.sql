@@ -1,21 +1,18 @@
--- agents table
-CREATE TABLE IF NOT EXISTS agents
-(
+-- Create agents table
+CREATE TABLE IF NOT EXISTS agents (
   id            VARCHAR(64) PRIMARY KEY,
   hostname      VARCHAR(255) NOT NULL,
   version       VARCHAR(32)  NOT NULL,
   status        VARCHAR(16)  NOT NULL,
-  last_seen     DATETIME     NOT NULL,
-  registered_at DATETIME     NOT NULL,
-  updated_at    DATETIME     NOT NULL,
+  last_seen     DATETIME    NOT NULL,
+  registered_at DATETIME    NOT NULL,
+  updated_at    DATETIME    NOT NULL,
   INDEX idx_agents_status (status),
   INDEX idx_agents_last_seen (last_seen)
-) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4;
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
--- metrics table
-CREATE TABLE IF NOT EXISTS metrics
-(
+-- Create metrics table
+CREATE TABLE IF NOT EXISTS metrics (
   id           BIGINT AUTO_INCREMENT PRIMARY KEY,
   agent_id     VARCHAR(64) NOT NULL,
   timestamp    DATETIME    NOT NULL,
@@ -23,13 +20,12 @@ CREATE TABLE IF NOT EXISTS metrics
   reported_at  DATETIME    NOT NULL,
   data         JSON        NOT NULL,
   created_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  INDEX idx_metrics_agent_time (agent_id, timestamp)
-) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4;
+  INDEX idx_metrics_agent_time (agent_id, timestamp),
+  FOREIGN KEY (agent_id) REFERENCES agents (id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
 
--- ip_changes table
-CREATE TABLE IF NOT EXISTS ip_changes
-(
+-- Create ip_changes table
+CREATE TABLE IF NOT EXISTS ip_changes (
   id             BIGINT AUTO_INCREMENT PRIMARY KEY,
   agent_id       VARCHAR(64) NOT NULL,
   interface_name VARCHAR(64),
@@ -44,5 +40,4 @@ CREATE TABLE IF NOT EXISTS ip_changes
   INDEX idx_agent_time (agent_id, timestamp),
   INDEX idx_interface (interface_name),
   INDEX idx_created_at (created_at)
-) ENGINE = InnoDB
-  DEFAULT CHARSET = utf8mb4;
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
