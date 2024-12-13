@@ -10,71 +10,80 @@ import (
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// New creates a new logger
+// New creates a new logger instance with the provided configuration
 func New(cfg *Config) (*zap.Logger, error) {
 	if cfg == nil {
-		return nil, fmt.Errorf("logger config is nil")
+		cfg = DefaultConfig()
 	}
-	// Check if the log file path exists
-	_, err := os.Stat(cfg.File)
-	if os.IsNotExist(err) {
-		// Create the directory if it doesn't exist
+
+	cfg = cfg.SetDefaults()
+	if err := cfg.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid logger config: %w", err)
+	}
+
+	// Create log directory if file path is specified
+	if cfg.File != "" {
 		if err := os.MkdirAll(filepath.Dir(cfg.File), 0755); err != nil {
 			return nil, fmt.Errorf("failed to create log directory: %w", err)
 		}
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to check log file path: %w", err)
 	}
 
-	// Configure log rotation
-	w := &lumberjack.Logger{
-		Filename:   cfg.File,
-		MaxSize:    cfg.MaxSize,
-		MaxBackups: cfg.MaxBackups,
-		MaxAge:     cfg.MaxAge,
-		Compress:   cfg.Compress,
-	}
-
-	// Set log level
-	var level zapcore.Level
-	switch cfg.Level {
-	case "debug":
-		level = zapcore.DebugLevel
-	case "info":
-		level = zapcore.InfoLevel
-	case "warn":
-		level = zapcore.WarnLevel
-	case "error":
-		level = zapcore.ErrorLevel
-	default:
-		level = zapcore.InfoLevel
-	}
-
-	// Create encoder config
+	// Configure encoder
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.TimeKey = "time"
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 	encoderConfig.EncodeDuration = zapcore.StringDurationEncoder
+	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
 
-	// Create core with both file and console output
-	core := zapcore.NewTee(
-		zapcore.NewCore(
+	// Set log level
+	level := getZapLevel(cfg.Level)
+
+	var cores []zapcore.Core
+
+	// Add file output if configured
+	if cfg.File != "" {
+		w := &lumberjack.Logger{
+			Filename:   cfg.File,
+			MaxSize:    cfg.MaxSize,
+			MaxBackups: cfg.MaxBackups,
+			MaxAge:     cfg.MaxAge,
+			Compress:   cfg.Compress,
+		}
+
+		cores = append(cores, zapcore.NewCore(
 			zapcore.NewJSONEncoder(encoderConfig),
 			zapcore.AddSync(w),
 			level,
-		),
-		zapcore.NewCore(
-			zapcore.NewConsoleEncoder(encoderConfig),
-			zapcore.AddSync(os.Stdout),
-			level,
-		),
-	)
+		))
+	}
 
-	// Create logger
-	logger := zap.New(core,
+	// Add console output
+	cores = append(cores, zapcore.NewCore(
+		zapcore.NewConsoleEncoder(encoderConfig),
+		zapcore.AddSync(os.Stdout),
+		level,
+	))
+
+	// Create logger with multiple outputs
+	core := zapcore.NewTee(cores...)
+	return zap.New(core,
 		zap.AddCaller(),
 		zap.AddStacktrace(zapcore.ErrorLevel),
-	)
+	), nil
+}
 
-	return logger.Named("server"), nil
+// getZapLevel converts string level to zapcore.Level
+func getZapLevel(level string) zapcore.Level {
+	switch level {
+	case "debug":
+		return zapcore.DebugLevel
+	case "info":
+		return zapcore.InfoLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.InfoLevel
+	}
 }

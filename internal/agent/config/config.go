@@ -189,9 +189,6 @@ func setDefaults(cfg *Config) {
 		}
 	}
 
-	// Set defaults for logger
-	cfg.Log = cfg.Log.SetDefaults()
-
 	// Set defaults for retry
 	cfg.Retry = cfg.Retry.SetDefaults()
 }

@@ -264,18 +264,6 @@ func setDefaults(cfg *Config) {
 		cfg.API.CORS.MaxAge = 86400
 	}
 
-	if cfg.Log.MaxSize == 0 {
-		cfg.Log.MaxSize = 100
-	}
-
-	if cfg.Log.MaxBackups == 0 {
-		cfg.Log.MaxBackups = 3
-	}
-
-	if cfg.Log.MaxAge == 0 {
-		cfg.Log.MaxAge = 28
-	}
-
 	// Set default allowed methods for CORS
 	if len(cfg.API.CORS.AllowedMethods) == 0 {
 		cfg.API.CORS.AllowedMethods = []string{
