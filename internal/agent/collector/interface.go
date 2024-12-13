@@ -11,7 +11,7 @@ type Collector interface {
 	Name() string
 	// Start starts the collector
 	Start(ctx context.Context) error
-	// Collect performs a single collection
+	// Collect performs single collection
 	Collect(ctx context.Context) (*types.MetricsData, error)
 	// Stop stops the collector
 	Stop() error

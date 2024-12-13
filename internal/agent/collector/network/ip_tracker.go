@@ -35,7 +35,7 @@ type IPTrackerMetrics struct {
 	ExternalFailures int64
 }
 
-// NewIPTracker creates a new IP tracker
+// NewIPTracker creates new IP tracker
 func NewIPTracker(cfg *config.IPTrackerConfig, logger *zap.Logger) *IPTracker {
 	if logger == nil {
 		logger = zap.NewNop()

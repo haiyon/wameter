@@ -134,7 +134,7 @@ func (d *Database) QueryRowContext(ctx context.Context, query string, args ...an
 	return row
 }
 
-// PrepareContext prepares a statement with proper resource management
+// PrepareContext prepares statement and returns it
 func (d *Database) PrepareContext(ctx context.Context, query string) (*sql.Stmt, error) {
 	// Check statement cache first
 	if d.opts.StatementCache {

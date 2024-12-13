@@ -14,7 +14,7 @@ type Manager struct {
 	logger   *zap.Logger
 }
 
-// NewManager creates a new notification manager for agent
+// NewManager creates new notification manager for agent
 func NewManager(cfg *config.NotifyConfig, logger *zap.Logger) (*Manager, error) {
 	// Check if notifications are enabled
 	if !cfg.Enabled {

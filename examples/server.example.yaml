@@ -26,7 +26,7 @@ database:
   auto_migrate: true
   migrations_path: "/etc/wameter/migrations" #  or "./migrations"
   # rollback_steps: 10 # Rollback the last 10 migrations
-  # target_version: "1733738539072" # migrate to a specific version
+  # target_version: "1733738539072" # migrate to specific version
   # Connection pool settings
   max_connections: 25
   max_idle_conns: 5

@@ -25,7 +25,7 @@ type Manager struct {
 	startTime  time.Time
 }
 
-// NewManager creates a new collector manager
+// NewManager creates new collector manager
 func NewManager(cfg *config.Config, reporter *reporter.Reporter, notifier *notify.Manager, logger *zap.Logger) *Manager {
 	return &Manager{
 		reporter:   reporter,
@@ -37,7 +37,7 @@ func NewManager(cfg *config.Config, reporter *reporter.Reporter, notifier *notif
 	}
 }
 
-// RegisterCollector registers a new collector
+// RegisterCollector registers new collector
 func (m *Manager) RegisterCollector(c Collector) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()

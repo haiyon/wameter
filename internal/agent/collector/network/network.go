@@ -23,7 +23,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// networkCollector represents a network collector
+// networkCollector represents network collector implementation
 type networkCollector struct {
 	standalone bool
 	config     *config.NetworkConfig
@@ -39,7 +39,7 @@ type networkCollector struct {
 	wg         sync.WaitGroup
 }
 
-// NewCollector creates a new network collector
+// NewCollector creates new network collector
 func NewCollector(cfg *config.NetworkConfig, agentID string, reporter *reporter.Reporter, notifier *notify.Manager, standalone bool, logger *zap.Logger) *networkCollector {
 	if cfg.IPTracker == nil {
 		cfg.IPTracker = config.IPtrackerDefaultConfig()
@@ -116,7 +116,7 @@ func (c *networkCollector) Stop() error {
 	return nil
 }
 
-// Collect performs a single collection
+// Collect performs single collection
 func (c *networkCollector) Collect(ctx context.Context) (*types.MetricsData, error) {
 	if !c.config.Enabled {
 		return nil, nil
@@ -394,7 +394,7 @@ func (c *networkCollector) getExternalIP(ctx context.Context) (string, error) {
 	return "", fmt.Errorf("failed to get external IP: %v", lastErr)
 }
 
-// queryExternalProvider queries a single external IP provider
+// queryExternalProvider queries single external IP provider
 func (c *networkCollector) queryExternalProvider(ctx context.Context, provider string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, provider, nil)
 	if err != nil {

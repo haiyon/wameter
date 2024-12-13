@@ -111,7 +111,7 @@ func run(ctx context.Context, cfg *config.Config, logger *zap.Logger) (err error
 		}
 	}
 
-	// Handle cleanup in a separate goroutine
+	// Handle cleanup in separate goroutine
 	go func() {
 		<-ctx.Done()
 		// Stop components in reverse order

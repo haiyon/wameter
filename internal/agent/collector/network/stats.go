@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// statsCollector represents a stats collector
+// statsCollector represents stats collector implementation
 type statsCollector struct {
 	config    *config.NetworkConfig
 	logger    *zap.Logger
@@ -23,7 +23,7 @@ type statsCollector struct {
 	mu        sync.RWMutex
 }
 
-// newStatsCollector creates a new stats collector
+// newStatsCollector creates new stats collector
 func newStatsCollector(cfg *config.NetworkConfig, logger *zap.Logger) *statsCollector {
 	return &statsCollector{
 		config:    cfg,

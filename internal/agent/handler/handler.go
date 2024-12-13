@@ -243,7 +243,7 @@ func (h *Handler) heartbeat(ctx context.Context) {
 	}
 }
 
-// sendHeartbeat sends a heartbeat to the server
+// sendHeartbeat sends heartbeat to the server
 func (h *Handler) sendHeartbeat(ctx context.Context) error {
 	url := fmt.Sprintf("%s/v1/agents/%s/heartbeat",
 		h.config.Agent.Server.Address,

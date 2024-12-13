@@ -18,7 +18,7 @@ type Router struct {
 	logger *zap.Logger
 }
 
-// NewRouter creates and configures a new router
+// NewRouter creates new router
 func NewRouter(cfg *config.Config, svc *service.Service, logger *zap.Logger) *Router {
 	// Set gin mode based on config
 	if cfg.Log.Level != "debug" {
