@@ -6,8 +6,8 @@ import (
 	"time"
 	"wameter/internal/database"
 	"wameter/internal/server/config"
+	"wameter/internal/server/data/repository"
 	"wameter/internal/server/notify"
-	"wameter/internal/server/repository"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"

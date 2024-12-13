@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"time"
-	"wameter/internal/server/repository"
+	"wameter/internal/server/data/repository"
 	"wameter/internal/types"
 
 	"go.uber.org/zap"
