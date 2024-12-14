@@ -51,4 +51,3 @@ config.json
 /data.db
 /data.db-wal
 /data.db-shm
-internal/server/data/ent

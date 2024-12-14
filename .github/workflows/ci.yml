@@ -31,15 +31,6 @@ jobs:
       - name: Generate code
         run: make generate
 
-      - name: Upload generated code
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-code
-          path: |
-            ./internal
-            ./pkg
-          retention-days: 1
-
   verify:
     name: Verify
     needs: generate
@@ -55,12 +46,6 @@ jobs:
           go-version: '1.22'
           check-latest: true
           cache: true
-
-      - name: Download generated code
-        uses: actions/download-artifact@v4
-        with:
-          name: generated-code
-          path: .
 
       - name: Verify dependencies
         run: |
@@ -112,12 +97,6 @@ jobs:
         with:
           platforms: arm64
 
-      - name: Download generated code
-        uses: actions/download-artifact@v4
-        with:
-          name: generated-code
-          path: .
-
       - name: Build
         env:
           GOOS: ${{ matrix.os }}
@@ -152,12 +131,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
-      - name: Download generated code
-        uses: actions/download-artifact@v4
-        with:
-          name: generated-code
-          path: .
 
       - name: Build image
         uses: docker/build-push-action@v5
