@@ -22,12 +22,11 @@ var (
 
 // DBManager manages database connections for read-write splitting
 type DBManager struct {
-	master     *sql.DB
-	slaves     []*sql.DB
-	strategy   LoadBalancer
-	mutex      sync.RWMutex
-	maxRetry   int
-	currentIdx uint64 // for round robin
+	master   *sql.DB
+	slaves   []*sql.DB
+	strategy LoadBalancer
+	mutex    sync.RWMutex
+	maxRetry int
 }
 
 // LoadBalancer LoadBalancer interface
@@ -204,25 +203,20 @@ func (dm *DBManager) Slave() (*sql.DB, error) {
 	dm.mutex.RLock()
 	defer dm.mutex.RUnlock()
 
-	var lastErr error
 	for i := 0; i <= dm.maxRetry; i++ {
 		slave, err := dm.strategy.Next(dm.slaves)
 		if err != nil {
-			lastErr = err
 			continue
 		}
 
 		// Test the slave database connection
-		if err := slave.PingContext(context.Background()); err != nil {
-			lastErr = err
-			continue
+		if err := slave.PingContext(context.Background()); err == nil {
+			return slave, nil
 		}
-
-		return slave, nil
 	}
 
-	// all retry attempts failed, return the last error
-	return nil, fmt.Errorf("all retry attempts failed: %v", lastErr)
+	// all retry attempts failed, return an error
+	return nil, fmt.Errorf("all retry attempts failed")
 }
 
 // Close closes all database connections

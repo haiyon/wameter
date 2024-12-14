@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+
 	"wameter/internal/data/config"
 	"wameter/internal/data/connection"
 	"wameter/internal/data/elastic"
@@ -12,6 +13,13 @@ import (
 	"wameter/internal/data/rabbitmq"
 
 	"github.com/redis/go-redis/v9"
+)
+
+type ContextKey string
+
+const (
+	// ContextKeyTransaction is context key
+	ContextKeyTransaction ContextKey = "tx"
 )
 
 var (
@@ -39,7 +47,7 @@ func New(cfg *config.Config, createNewInstance ...bool) (*Data, func(name ...str
 	if !createNew && sharedInstance != nil {
 		cleanup := func(name ...string) {
 			if errs := sharedInstance.Close(); len(errs) > 0 {
-				fmt.Printf("cleanup errors: %v", errs)
+				fmt.Printf("cleanup errors: %v\n", errs)
 			}
 		}
 		return sharedInstance, cleanup, nil
@@ -62,7 +70,7 @@ func New(cfg *config.Config, createNewInstance ...bool) (*Data, func(name ...str
 
 	cleanup := func(name ...string) {
 		if errs := d.Close(); len(errs) > 0 {
-			fmt.Printf("cleanup errors: %v", errs)
+			fmt.Printf("cleanup errors: %v\n", errs)
 		}
 	}
 
@@ -71,7 +79,7 @@ func New(cfg *config.Config, createNewInstance ...bool) (*Data, func(name ...str
 
 // GetTx retrieves transaction from context
 func GetTx(ctx context.Context) (*sql.Tx, error) {
-	tx, ok := ctx.Value("tx").(*sql.Tx)
+	tx, ok := ctx.Value(ContextKeyTransaction).(*sql.Tx)
 	if !ok {
 		return nil, fmt.Errorf("transaction not found in context")
 	}
@@ -90,10 +98,10 @@ func (d *Data) WithTx(ctx context.Context, fn func(ctx context.Context) error) e
 		return err
 	}
 
-	err = fn(context.WithValue(ctx, "tx", tx))
+	err = fn(context.WithValue(ctx, ContextKeyTransaction, tx))
 	if err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
-			return fmt.Errorf("tx err: %v, rb err: %v", err, rbErr)
+			return fmt.Errorf("tx err: %v, rollback err: %v", err, rbErr)
 		}
 		return err
 	}
@@ -115,10 +123,9 @@ func (d *Data) WithTxRead(ctx context.Context, fn func(ctx context.Context) erro
 		return err
 	}
 
-	err = fn(context.WithValue(ctx, "tx", tx))
-	if err != nil {
+	if err = fn(context.WithValue(ctx, ContextKeyTransaction, tx)); err != nil {
 		if rbErr := tx.Rollback(); rbErr != nil {
-			return fmt.Errorf("tx err: %v, rb err: %v", err, rbErr)
+			return fmt.Errorf("tx err: %v, rollback err: %v", err, rbErr)
 		}
 		return err
 	}
@@ -147,7 +154,7 @@ func (d *Data) DBRead() (*sql.DB, error) {
 	if d.Conn != nil {
 		return d.Conn.DBRead()
 	}
-	return nil, nil
+	return nil, fmt.Errorf("no database connection available")
 }
 
 // GetRedis get redis
@@ -160,7 +167,7 @@ func (d *Data) GetMeilisearch() *meili.Client {
 	return d.Conn.MS
 }
 
-// GetElasticsearch get meilisearch
+// GetElasticsearch get elasticsearch
 func (d *Data) GetElasticsearch() *elastic.Client {
 	return d.Conn.ES
 }
@@ -175,7 +182,7 @@ func (d *Data) Ping(ctx context.Context) error {
 	if d.Conn != nil {
 		return d.Conn.Ping(ctx)
 	}
-	return nil
+	return fmt.Errorf("no connection manager available")
 }
 
 // Close closes all data connections
