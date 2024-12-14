@@ -17,8 +17,8 @@ permissions:
   packages: write
 
 jobs:
-  verify:
-    name: Verify
+  generate:
+    name: Generate Code
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -51,6 +51,37 @@ jobs:
       - name: Generate code
         run: make generate
 
+      - name: Upload generated code
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-code
+          path: |
+            ./internal
+            ./pkg
+          retention-days: 1
+
+  verify:
+    name: Verify
+    needs: generate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          check-latest: true
+          cache: true
+
+      - name: Download generated code
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-code
+          path: .
+
       - name: Verify dependencies
         run: make verify
 
@@ -65,7 +96,7 @@ jobs:
 
   build-all:
     name: Build All Platforms
-    needs: verify
+    needs: [generate, verify]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -98,27 +129,31 @@ jobs:
         with:
           platforms: arm64
 
-      - name: Generate code
-        run: make generate
+      - name: Download generated code
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-code
+          path: .
 
       - name: Build for platform
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
-          VERSION: ${{ needs.verify.outputs.version }}
+          VERSION: ${{ needs.generate.outputs.version }}
+          CGO_ENABLED: 0
         run: |
           make build dist
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: wameter-${{ needs.verify.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}
+          name: wameter-${{ needs.generate.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}
           path: dist/
           retention-days: 7
 
   docker-release:
     name: Docker Release
-    needs: [ verify, build-all ]
+    needs: [generate, verify, build-all]
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -141,8 +176,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Generate code
-        run: make generate
+      - name: Download generated code
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-code
+          path: .
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -157,13 +195,13 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}${{ matrix.image.suffix }}
           tags: |
-            type=semver,pattern={{version}},value=${{ needs.verify.outputs.version }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ needs.verify.outputs.version }}
-            type=raw,value=latest,enable=${{ endsWith(needs.verify.outputs.version, '.0') }}
+            type=semver,pattern={{version}},value=${{ needs.generate.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.generate.outputs.version }}
+            type=raw,value=latest,enable=${{ endsWith(needs.generate.outputs.version, '.0') }}
           labels: |
             org.opencontainers.image.title=Wameter ${{ matrix.image.name }}
             org.opencontainers.image.description=Wameter ${{ matrix.image.name }} - Monitoring ${{ matrix.image.name }}
-            org.opencontainers.image.version=${{ needs.verify.outputs.version }}
+            org.opencontainers.image.version=${{ needs.generate.outputs.version }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.licenses=MIT
 
@@ -181,7 +219,7 @@ jobs:
 
   release:
     name: Create Release
-    needs: [ verify, build-all, docker-release ]
+    needs: [generate, verify, build-all, docker-release]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -200,12 +238,12 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
-          name: ${{ needs.verify.outputs.version }}
+          name: ${{ needs.generate.outputs.version }}
           files: |
             artifacts/**/*.tar.gz
             artifacts/sha256sums.txt
           draft: true
-          prerelease: ${{ contains(needs.verify.outputs.version, '-rc') || contains(needs.verify.outputs.version, '-beta') || contains(needs.verify.outputs.version, '-alpha') }}
+          prerelease: ${{ contains(needs.generate.outputs.version, '-rc') || contains(needs.generate.outputs.version, '-beta') || contains(needs.generate.outputs.version, '-alpha') }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
