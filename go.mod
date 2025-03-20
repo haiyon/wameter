@@ -18,7 +18,7 @@ require (
 	github.com/meilisearch/meilisearch-go v0.29.0
 	github.com/neo4j/neo4j-go-driver/v5 v5.27.0
 	github.com/rabbitmq/amqp091-go v1.10.0
-	github.com/redis/go-redis/v9 v9.7.0
+	github.com/redis/go-redis/v9 v9.7.3
 	github.com/segmentio/kafka-go v0.4.47
 	github.com/spf13/viper v1.19.0
 	github.com/stretchr/testify v1.10.0
